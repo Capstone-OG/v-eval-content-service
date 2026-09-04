@@ -3,6 +3,9 @@ using MediatR;
 using V_Eval_Content_Service.Infrastructure.Persistence;
 using V_Eval_Content_Service.Application.Common.Interfaces;
 using V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam;
+using V_Eval_Content_Service.Application.MockExams.Commands.DeleteMockExam;
+using V_Eval_Content_Service.Application.MockExams.Queries.GetMockExams;
+using V_Eval_Content_Service.Application.MockExams.Queries.GetMockExamById;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,5 +62,58 @@ app.MapPost("/api/content/exams/import", async (ImportMockExamCommand command, I
 })
 .WithName("ImportMockExam")
 .DisableAntiforgery();
+
+// Endpoint lấy danh sách đề thi trong Database
+app.MapGet("/api/content/exams", async (IMediator mediator) =>
+{
+    try
+    {
+        var exams = await mediator.Send(new GetMockExamsQuery());
+        return Results.Ok(exams);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500, title: "Lỗi khi lấy danh sách đề thi");
+    }
+})
+.WithName("GetMockExams");
+
+// Endpoint lấy chi tiết một đề thi theo ExamId
+app.MapGet("/api/content/exams/{id:guid}", async (Guid id, IMediator mediator) =>
+{
+    try
+    {
+        var exam = await mediator.Send(new GetMockExamByIdQuery(id));
+        if (exam == null)
+        {
+            return Results.NotFound(new { message = $"Không tìm thấy đề thi với ID: {id}" });
+        }
+        return Results.Ok(exam);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500, title: "Lỗi khi lấy chi tiết đề thi");
+    }
+})
+.WithName("GetMockExamById");
+
+// Endpoint xóa đề thi theo ExamId
+app.MapDelete("/api/content/exams/{id:guid}", async (Guid id, IMediator mediator) =>
+{
+    try
+    {
+        var success = await mediator.Send(new DeleteMockExamCommand(id));
+        if (!success)
+        {
+            return Results.NotFound(new { message = $"Không tìm thấy đề thi với ID: {id} để xóa" });
+        }
+        return Results.Ok(new { message = "Đã xóa đề thi thành công!", exam_id = id });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500, title: "Lỗi khi xóa đề thi");
+    }
+})
+.WithName("DeleteMockExam");
 
 app.Run();
