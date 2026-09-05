@@ -52,6 +52,20 @@ Mở rộng các API Quản lý Đề thi (Listing, Details, Cascade Deletion), 
 | **Cấu hình CORS Cross-Origin Resource Sharing** | 🟢 Hoàn thành | Mở quyền truy cập cho cổng `http://localhost:5104` (AI Engine Web Viewer) và các Web/Mobile Clients. |
 | **Kiểm thử Liên thông Toàn vẹn (End-to-End Test)** | 🟢 Hoàn thành | Kiểm thử luồng: Parse đề 120 câu từ PDF bằng AI -> Xem trên Web Viewer -> Nhấn "Lưu vào Database" -> Lưu thành công vào Supabase -> Đọc chi tiết bằng `GET` API. |
 | **Khởi tạo Hệ thống Tài liệu Kỹ thuật (`docs/`)** | 🟢 Hoàn thành | Soạn thảo `docs/daily_process_and_planning.md`, `docs/content_service_architecture.md`, `docs/exam_management_api.md`. |
+ 
+---
+
+## 📅 Cập nhật ngày 05/09/2026
+
+### 🎯 Mục tiêu hiện tại (Milestone 3.1)
+Mở rộng cấu trúc tiếp nhận dữ liệu từ AI Engine để lưu trữ hình ảnh câu hỏi đơn lẻ (như đồ thị $a-x$, ảnh gương cầu lồi) bên cạnh hình ảnh chùm bài đọc hiểu đã có, đảm bảo hiển thị đồng bộ trên hệ thống thi trực tuyến.
+
+### 📋 Danh sách Task & Trạng thái
+
+| Tên Task | Trạng thái | Ghi chú |
+| :--- | :---: | :--- |
+| **Bổ sung ImageUrl vào QuestionDto** | 🟢 Hoàn thành | Mở rộng DTO `ImportMockExamCommand.cs` với trường `ImageUrl` cho từng câu hỏi. |
+| **Tự động Định dạng Hình ảnh vào ContentLatex** | 🟢 Hoàn thành | Xử lý trong `ImportMockExamCommandHandler`: chèn cú pháp Markdown Image `![Hình minh họa](image_url)` vào `ContentLatex` của câu hỏi khi lưu trữ vào PostgreSQL. |
 
 ---
 

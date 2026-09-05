@@ -20,7 +20,8 @@
 ## 🚀 Các Tính Năng Cốt Lõi
 
 1. **Nhập Đề thi Tự động từ AI Engine (`POST /api/content/exams/import`)**:
-   * Tiếp nhận payload JSON chuẩn bóc tách từ 120 câu hỏi PDF (gồm LaTeX, lựa chọn A-B-C-D, đáp án đúng, giải thích).
+   * Tiếp nhận payload JSON chuẩn bóc tách từ 120 câu hỏi PDF (gồm LaTeX, lựa chọn A-B-C-D, đáp án đúng, giải thích, đường dẫn hình ảnh `ImageUrl`).
+   * Hỗ trợ lưu trữ hình ảnh cho cả câu hỏi đơn lẻ và chùm bài đọc hiểu: tự động nhúng cú pháp Markdown `![Hình minh họa](image_url)` vào `ContentLatex` để hiển thị đồng bộ trên mọi thiết bị học tập.
    * Tự động nhận diện và tạo kỹ năng mới (`skills`) theo lĩnh vực năng lực tương ứng nếu chưa tồn tại trong cơ sở dữ liệu.
    * Lưu trữ quan hệ phân cấp giữa đề thi, câu hỏi và chùm bài đọc hiểu (`passages`) với tính toàn vẹn giao dịch cao.
 2. **Truy vấn Danh sách Đề thi (`GET /api/content/exams`)**:

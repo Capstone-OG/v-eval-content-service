@@ -35,6 +35,7 @@ namespace V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam
         public string? Explanation { get; set; }
         public int DifficultyLevel { get; set; } = 2; // 1: Easy, 2: Medium, 3: Hard
         public string? SuggestedSkillName { get; set; } // Ví dụ: Cực trị hàm số
+        public string? ImageUrl { get; set; }
     }
 
     public class OptionsDto

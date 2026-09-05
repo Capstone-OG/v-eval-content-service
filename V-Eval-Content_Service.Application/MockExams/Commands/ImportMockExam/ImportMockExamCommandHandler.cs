@@ -52,13 +52,17 @@ namespace V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam
                 {
                     var skillId = await GetOrCreateSkillIdAsync(qDto.SuggestedSkillName, request.SubjectCode, cancellationToken);
 
+                    var questionContent = !string.IsNullOrWhiteSpace(qDto.ImageUrl) && !qDto.Content.Contains(qDto.ImageUrl)
+                        ? $"![Hình minh họa]({qDto.ImageUrl})\n\n{qDto.Content}"
+                        : qDto.Content;
+
                     var question = new Question
                     {
                         QuestionId = Guid.NewGuid(),
                         SkillId = skillId,
                         PassageId = passage.PassageId,
                         DifficultyLevel = qDto.DifficultyLevel,
-                        ContentLatex = qDto.Content,
+                        ContentLatex = questionContent,
                         OptionA = qDto.Options.A,
                         OptionB = qDto.Options.B,
                         OptionC = qDto.Options.C,
@@ -84,13 +88,17 @@ namespace V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam
             {
                 var skillId = await GetOrCreateSkillIdAsync(qDto.SuggestedSkillName, request.SubjectCode, cancellationToken);
 
+                var questionContent = !string.IsNullOrWhiteSpace(qDto.ImageUrl) && !qDto.Content.Contains(qDto.ImageUrl)
+                    ? $"![Hình minh họa]({qDto.ImageUrl})\n\n{qDto.Content}"
+                    : qDto.Content;
+
                 var question = new Question
                 {
                     QuestionId = Guid.NewGuid(),
                     SkillId = skillId,
                     PassageId = null,
                     DifficultyLevel = qDto.DifficultyLevel,
-                    ContentLatex = qDto.Content,
+                    ContentLatex = questionContent,
                     OptionA = qDto.Options.A,
                     OptionB = qDto.Options.B,
                     OptionC = qDto.Options.C,

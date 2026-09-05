@@ -74,7 +74,8 @@ graph LR
         "correctOption": "A",
         "explanation": "",
         "difficultyLevel": 2,
-        "suggestedSkillName": "Hàm số mũ và logarit"
+        "suggestedSkillName": "Hàm số mũ và logarit",
+        "imageUrl": "/extracted_images/3e732ab5/p9_img3.png"
       }
     ]
   }
