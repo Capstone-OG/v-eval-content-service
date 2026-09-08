@@ -69,6 +69,22 @@ Mở rộng cấu trúc tiếp nhận dữ liệu từ AI Engine để lưu tr�
 
 ---
 
+## 📅 Cập nhật ngày 06/09/2026 - 07/09/2026
+
+### 🎯 Mục tiêu hiện tại (Milestone 3.2)
+Tối ưu hóa tiếp nhận & chuẩn hóa dữ liệu công thức Toán - Lý - Hóa, đảm bảo tương thích tuyệt đối với cấu trúc Bảng số liệu lồng 2 tầng (`colspan`/`rowspan`), đồng bộ phân tuyến hình ảnh minh họa và kiểm chứng toàn vẹn chu trình lưu - tải đề thi 2 chiều với Supabase PostgreSQL.
+
+### 📋 Danh sách Task & Trạng thái
+
+| Tên Task | Trạng thái | Ghi chú |
+| :--- | :---: | :--- |
+| **Bảo toàn Chuỗi Thoát Công thức LaTeX / Hóa - Lý** | 🟢 Hoàn thành | Đồng bộ với bộ làm sạch `SanitizeJsonForLatex` của AI Engine: Đảm bảo chuỗi JSON gửi tới `POST /api/content/exams/import` chứa các ký tự thoát LaTeX đặc biệt (`\\frac`, `\\times`, `\\Delta`, `\\text`) và số mũ âm ($2,33 \cdot 10^{-3}\text{ mol}\cdot\text{l}^{-1}\cdot\text{phút}^{-1}$) không bị nuốt ký tự, lưu trữ nguyên trạng vào cột `content_latex`. |
+| **Hỗ trợ Lưu trữ & Bảo toàn Bảng Số liệu HTML 2 Tầng** | 🟢 Hoàn thành | Trường `content` của `Passages` và `Questions` tiếp nhận trọn vẹn cấu trúc bảng HTML `<table>` có `rowspan="2"` và `colspan="n"` (như chùm câu 109–111), đảm bảo khi tải lại đề từ CSDL hiển thị đúng chuẩn lưới hình học. |
+| **Đồng bộ Phân Tuyến Hình ảnh Minh Họa** | 🟢 Hoàn thành | Tương thích với bộ lọc `isChartOrTable` của AI Engine: Chỉ nhúng cú pháp `![Hình minh họa](image_url)` cho các câu hỏi/chùm bài thực sự có ảnh cắt tĩnh (đồ thị dao động điều hòa $a-x$, sơ đồ thí nghiệm). Các câu hỏi dạng biểu đồ hoặc bảng số liệu giữ nguyên văn bản để Frontend tự dựng Canvas Chart.js và HTML Table tương tác. |
+| **Kiểm Thử Toàn Diện Liên Thông 2 Chiều với Supabase** | 🟢 Hoàn thành | Xác nhận chu trình khép kín: AI Engine phân tích PDF 16 trang -> Web Viewer kiểm tra -> Nhấn "Lưu vào Database" (gọi Content Service) -> Dữ liệu ghi thành công vào PostgreSQL -> Tải lại từ CSDL qua `GET /api/content/exams/{id}` hiển thị sắc nét 100% cả 120 câu hỏi. |
+
+---
+
 ## 📅 Kế hoạch Tiếp theo (Upcoming Roadmap)
 
 ### 🎯 Milestone 4: Quản lý Ngân hàng Câu hỏi & Thống kê Độ khó (Question Bank & Tagging)
@@ -79,3 +95,4 @@ Mở rộng cấu trúc tiếp nhận dữ liệu từ AI Engine để lưu tr�
 ### 🎯 Milestone 5: Tích hợp Adaptive Testing & Exam Session Tracking
 - [ ] Phối hợp cùng phân hệ Evaluation Service để sinh đề thi thích ứng (CAT - Computerized Adaptive Testing) dựa trên năng lực học sinh.
 - [ ] Lưu trữ và quản lý tài liệu lý thuyết (`materials`) kèm tệp đính kèm (`file_url`) phục vụ luồng RAG của AI Engine.
+- [ ] Tích hợp API Gateway (YARP) tại `V-Eval-Gateway` chuyển tiếp `/api/content/*` về cổng `5249`.

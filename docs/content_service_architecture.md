@@ -168,10 +168,14 @@ sequenceDiagram
 ### Điểm nổi bật trong xử lý dữ liệu:
 1. **Dynamic Skill Auto-Creation**:
    * Khi AI trích xuất câu hỏi kèm `suggestedSkillName`, Content Service tự động kiểm tra xem kỹ năng đó đã có trong cơ sở dữ liệu hay chưa.
-   * Nếu chưa có, hệ thống tự động gán vào Domain phù hợp (`MATH`, `LOGIC`, `VIET`, v.v.) và lưu vào bảng `skills` để tái sử dụng, giúp giảm thiểu thao tác nhập liệu thủ công của giáo viên.
-2. **Bảo toàn Tuyệt đối Công thức LaTeX**:
-   * Mọi ký hiệu toán học như ma trận, tích phân, căn bậc hai, phân số đều được lưu giữ nguyên trạng (`$f(x) = \int_0^1 ...$`) trong trường `content_latex` và các trường `option_a`, `option_b`, `option_c`, `option_d`.
-3. **Toàn vẹn Giao dịch (Transaction Integrity)**:
+   * Nếu chưa có, hệ thống tự động gán vào Domain phù hợp (`MATH`, `LOGIC`, `VIET`, `PHYS`, `CHEM`, `BIOL`, v.v.) và lưu vào bảng `skills` để tái sử dụng, giúp giảm thiểu thao tác nhập liệu thủ công của giáo viên.
+2. **Bảo toàn Tuyệt đối Công thức Toán - Lý - Hóa (LaTeX Fidelity - Cập nhật 06-07/09/2026)**:
+   * Mọi ký hiệu toán học (ma trận, tích phân, căn bậc hai, phân số) và các công thức Vật lý/Hóa học phức tạp (hiệu suất truyền tải điện, tốc độ phản ứng, ký hiệu Delta $\Delta$, đơn vị số mũ âm $2,33 \cdot 10^{-3}\text{ mol}\cdot\text{l}^{-1}\cdot\text{phút}^{-1}$) đều được lưu giữ nguyên trạng với ký tự thoát chuẩn xác trong trường `content_latex` và các trường `option_a`, `option_b`, `option_c`, `option_d`.
+3. **Hỗ Trợ Bảng Số Liệu Lồng 2 Tầng (`Colspan` / `Rowspan`)**:
+   * Cột `content` trong các bảng `passages` và `questions` tiếp nhận trọn vẹn mã HTML `<table>` có cấu trúc đa tầng, bảo toàn nguyên vẹn ngữ cảnh tiêu đề cha - con cho các bài toán phân tích số liệu (như Chùm 109–111).
+4. **Nhúng Tự Động Hình Ảnh Minh Họa (`ImageUrl`)**:
+   * Đối với các câu hỏi có hình ảnh đính kèm (đồ thị dao động $a-x$, sơ đồ thí nghiệm), handler tự động nhúng cú pháp Markdown `![Hình minh họa](image_url)` vào `content_latex`, giúp hiển thị đồng bộ trên mọi nền tảng mà không cần thay đổi cấu trúc bảng CSDL.
+5. **Toàn vẹn Giao dịch (Transaction Integrity)**:
    * Toàn bộ 120 câu hỏi và các chùm bài đọc được lưu trong một `DbContext.SaveChangesAsync()` duy nhất. Nếu có bất kỳ lỗi nào xảy ra, dữ liệu sẽ tự động rollback mà không để lại dữ liệu rác.
 
 ---

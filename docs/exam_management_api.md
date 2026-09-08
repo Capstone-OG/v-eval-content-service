@@ -90,6 +90,11 @@ graph LR
   }
   ```
 
+#### 2.1.1. Lưu ý Xử lý Dữ liệu Khoa học & Bảng biểu (Cập nhật 06-07/09/2026):
+* **Bảo toàn Ký tự Thoát LaTeX**: Toàn bộ chuỗi chứa mã lệnh LaTeX như `\\frac`, `\\times`, `\\Delta`, `\\text` và số mũ âm ($2,33 \cdot 10^{-3}\text{ mol}\cdot\text{l}^{-1}\cdot\text{phút}^{-1}$) được gửi sang dạng JSON đã thoát ký tự kép, đảm bảo C# Deserializer không nuốt mất ký tự điều khiển ASCII và lưu trữ nguyên vẹn vào `content_latex`.
+* **Bảng Số Liệu 2 Tầng**: Trường `content` của `Passages` và `Questions` hỗ trợ lưu trực tiếp các thẻ HTML `<table>` có `colspan` và `rowspan` để bảo toàn cấu trúc bảng hình học phức tạp (như chùm câu 109–111).
+* **Đồng bộ Nhúng Hình Ảnh**: Khi `imageUrl` khác rỗng (đồ thị tọa độ, hình chụp thực tế, sơ đồ thí nghiệm), handler tự động nhúng cú pháp `![Hình minh họa](image_url)` vào `content_latex` để bất kỳ Client nào đọc qua API đều hiển thị được hình ảnh tương ứng.
+
 ---
 
 ### 2.2. Lấy Danh sách Đề thi (`GET /api/content/exams`)
