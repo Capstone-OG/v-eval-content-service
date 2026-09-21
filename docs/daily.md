@@ -1,5 +1,29 @@
 # NHẬT KÝ KIỂM TRẢ TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [20/09/2026] - Chuẩn Hóa Kiến Trúc Chuyên Nghiệp (Result Pattern, ErrorType, Controllers, Swagger UI), Đề Thi Chẩn Đoán 30 Câu & gRPC Server
+- **Chuẩn Hóa Kiến Trúc Giống Identity Service (`Application Layer`)**:
+  - Triển khai **Result Pattern**: [`Error.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Application/Common/Models/Error.cs) (hỗ trợ `ErrorType` từ Validation, NotFound, Conflict, Failure, Unauthorized đến Forbidden) và [`Result.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Application/Common/Models/Result.cs).
+  - Tích hợp **FluentValidation**: Cài đặt `FluentValidation.DependencyInjectionExtensions 12.1.1`, cấu hình [`ValidationBehavior.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Application/Common/Behaviors/ValidationBehavior.cs) tự động đóng gói lỗi xác thực vào `Result<T>.Failure(errors)`.
+- **Triển Khai Tính Năng Đề Thi Chẩn Đoán 30 Câu (Core Flow 1 - Bước 2)**:
+  - DTO chống gian lận: [`DiagnosticExamDto.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Application/Diagnostic/DTOs/DiagnosticExamDto.cs) loại bỏ 100% `CorrectOption` và `Explanation` để bảo mật đề khi gửi về client học sinh.
+  - Query & Handler: [`GetDiagnosticTestQuery.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Application/Diagnostic/Queries/GetDiagnosticTest/GetDiagnosticTestQuery.cs) truy xuất đề chẩn đoán `DIAGNOSTIC` trong CSDL PostgreSQL Supabase.
+  - Tự động Seeding đề chẩn đoán: [`DiagnosticExamSeeder.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Infrastructure/Persistence/Seeds/DiagnosticExamSeeder.cs) tự động tạo đề chẩn đoán 30 câu chuẩn mẫu nếu CSDL chưa có.
+- **Tầng API & Controller Chuẩn Hóa (`API Layer`)**:
+  - [`ApiControllerBase.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.API/Controllers/Base/ApiControllerBase.cs): Kế thừa `ControllerBase`, tự động map `Result<T>` và `ErrorType` sang mã HTTP (400, 404, 409...) kèm format JSON báo lỗi chi tiết.
+  - [`DiagnosticController.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.API/Controllers/DiagnosticController.cs): Cung cấp endpoint `GET /api/v1/content/diagnostic-test`.
+  - [`MockExamsController.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.API/Controllers/MockExamsController.cs): Chuyển đổi toàn bộ Minimal APIs cũ sang Controller chuẩn RESTful.
+  - [`GlobalExceptionHandlerMiddleware.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.API/Middlewares/GlobalExceptionHandlerMiddleware.cs): Bắt ngoại lệ 500 toàn cục.
+  - Tích hợp **Swagger UI**: Cài đặt `Swashbuckle.AspNetCore 7.3.1`, hiển thị Swagger UI chuyên nghiệp tại `http://localhost:5249/swagger`.
+- **Liên Dịch Vụ gRPC (Chấm Điểm Bài Nộp Học Sinh)**:
+  - Bổ sung RPC `GetExamAnswerKey` trong [`content.proto`](file:///d:/Capstone/grpc/content.proto).
+  - Triển khai [`ContentGrpcService.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.API/Services/ContentGrpcService.cs) cung cấp đáp án an toàn server-to-server cho `Practice_Service`.
+- **Kiểm Thử**:
+  - `dotnet build` Solution thành công: **0 Warning, 0 Error**.
+  - Gọi test `GET /api/v1/content/diagnostic-test` thành công trả về 30 câu hỏi sạch, không lộ đáp án.
+  - Gọi test `GET /api/v1/content/exams/{non_exist_id}` trả về 404 với JSON error chuẩn.
+
+---
+
 ## [18/09/2026] - Phát Hành Công Cụ Push Độc Lập `Scripts/push.bat` & Chuẩn Hóa Bộ Docs
 - **Khởi Tạo `Scripts/push.bat`**: Đóng gói công cụ push độc lập hỗ trợ 3 chế độ (nhánh hiện tại, danh sách số nhánh có sẵn, tạo nhánh mới).
 - **Chuẩn Hóa Bộ Docs Service**: Đồng bộ hệ thống tài liệu theo 3 file chuẩn `daily.md`, `process.md` và `architecture_acceptance.md`.

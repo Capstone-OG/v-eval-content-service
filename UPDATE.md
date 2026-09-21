@@ -1,5 +1,23 @@
 # Nhật Ký Cập Nhật (Update Log) - Content Service
 
+## [20/09/2026] - Chuẩn Hóa Kiến Trúc Chuyên Nghiệp (Result Pattern, ErrorType, Controllers, Swagger UI), Đề Thi Chẩn Đoán 30 Câu & gRPC Server
+- **Chuẩn Hóa Báo Lỗi & Result Pattern (Đồng Bộ Identity Service)**:
+  - Triển khai `Result<T>` và `Error` (`ErrorType`: `Validation`, `NotFound`, `Conflict`, `Failure`, `Unauthorized`, `Forbidden`).
+  - Triển khai `ApiControllerBase` tự động ánh xạ `Result<T>` và mã lỗi sang đúng HTTP status code chuẩn và format JSON chi tiết.
+  - Tích hợp `ValidationBehavior` qua FluentValidation trong pipeline MediatR.
+  - Thêm `GlobalExceptionHandlerMiddleware` xử lý lỗi 500 toàn cục.
+- **Core Flow 1 (Bước 2): Đề Thi Chẩn Đoán 30 Câu Khảo Sát Ban Đầu**:
+  - API `GET /api/v1/content/diagnostic-test`: Trả về bộ đề thi chẩn đoán 30 câu hỏi chuẩn định dạng V-ACT.
+  - Cơ chế chống gian lận (Anti-cheat): Ẩn 100% `CorrectOption` và `Explanation` khi gửi cho học sinh làm bài.
+  - Seeder tự động: `DiagnosticExamSeeder` kiểm tra và tự động khởi tạo đề chẩn đoán 30 câu trong CSDL PostgreSQL Supabase khi ứng dụng khởi động.
+- **Tầng API & Swagger UI**:
+  - Chuyển đổi toàn bộ Minimal APIs sang Controllers chuẩn RESTful (`DiagnosticController`, `MockExamsController`).
+  - Tích hợp `Swashbuckle.AspNetCore 7.3.1`, hiển thị Swagger UI phân nhóm trực quan tại `http://localhost:5249/swagger`.
+- **Liên Dịch Vụ gRPC (Chấm Điểm Bài Nộp)**:
+  - Bổ sung RPC `GetExamAnswerKey` trong `grpc/content.proto`.
+  - Triển khai `ContentGrpcService` cung cấp bảng đáp án an toàn server-to-server cho `Practice_Service` chấm điểm bài thi.
+- **Kiểm Thử**: Solution biên dịch sạch 100% (`dotnet build` 0 Error, 0 Warning).
+
 ## [18/09/2026] - Phát Hành Công Cụ Push Độc Lập `Scripts/push.bat` Cho Content Service
 - **Tích Hợp `Scripts/push.bat` Độc Lập**:
   - Khởi tạo script [`Scripts/push.bat`](file:///e:/CapStone/All%20Services/V-Eval-Content_Service/Scripts/push.bat) độc lập cho Content Service.

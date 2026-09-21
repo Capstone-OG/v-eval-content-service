@@ -1,30 +1,61 @@
-using Microsoft.EntityFrameworkCore;
+using FluentValidation;
 using MediatR;
-using V_Eval_Content_Service.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
+using V_Eval_Content_Service.API.Middlewares;
+using V_Eval_Content_Service.API.Services;
+using V_Eval_Content_Service.Application.Common.Behaviors;
 using V_Eval_Content_Service.Application.Common.Interfaces;
-using V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam;
-using V_Eval_Content_Service.Application.MockExams.Commands.DeleteMockExam;
-using V_Eval_Content_Service.Application.MockExams.Queries.GetMockExams;
-using V_Eval_Content_Service.Application.MockExams.Queries.GetMockExamById;
+using V_Eval_Content_Service.Application.Diagnostic.Queries.GetDiagnosticTest;
+using V_Eval_Content_Service.Infrastructure.Persistence;
+using V_Eval_Content_Service.Infrastructure.Persistence.Seeds;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// Cấu hình Kestrel: Cổng 5249 cho REST/Swagger (HTTP/1), Cổng 5250 cho gRPC Server (HTTP/2)
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenLocalhost(5249, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
+    options.ListenLocalhost(5250, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+});
 
-// Cấu hình kết nối PostgreSQL Supabase
+// 1. Đăng ký Controllers & API Explorer
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+
+// 2. Cấu hình Swagger UI trực quan
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "V-Eval Content Service API",
+        Version = "v1",
+        Description = "Microservice quản lý ngân hàng câu hỏi khảo thí, đề thi mô phỏng và bài thi chẩn đoán năng lực ban đầu (V-Eval Core Flow 1 - Bước 2)."
+    });
+});
+
+// 3. Cấu hình kết nối PostgreSQL Supabase (Schema content)
 builder.Services.AddDbContext<ContentDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
         b => b.MigrationsAssembly(typeof(ContentDbContext).Assembly.FullName)));
 
-// Đăng ký Dependency Injection cho IContentDbContext
+// 4. Đăng ký Dependency Injection cho IContentDbContext
 builder.Services.AddScoped<IContentDbContext>(provider => provider.GetRequiredService<ContentDbContext>());
 
-// Đăng ký MediatR cho Application Layer
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ImportMockExamCommand).Assembly));
+// 5. Đăng ký FluentValidation
+builder.Services.AddValidatorsFromAssembly(typeof(GetDiagnosticTestQuery).Assembly);
 
-// Cấu hình CORS
+// 6. Đăng ký MediatR kèm ValidationBehavior pipeline
+builder.Services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(GetDiagnosticTestQuery).Assembly);
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+});
+
+// 7. Cấu hình gRPC Server
+builder.Services.AddGrpc();
+
+// 8. Cấu hình CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -37,83 +68,39 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// 9. Middleware xử lý lỗi toàn cục
+app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+
 app.UseCors("AllowAll");
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// 10. Kích hoạt Swagger UI
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.MapOpenApi();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "V-Eval Content Service API v1");
+    c.RoutePrefix = "swagger";
+});
 
 app.UseHttpsRedirection();
 
-// Endpoint Minimal API để import dữ liệu đề thi đã bóc tách từ AI Engine
-app.MapPost("/api/content/exams/import", async (ImportMockExamCommand command, IMediator mediator) =>
-{
-    try
-    {
-        var examId = await mediator.Send(command);
-        return Results.Ok(new { exam_id = examId, message = "Import đề thi thành công vào Supabase PostgreSQL!" });
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem(detail: ex.Message, statusCode: 500, title: "Lỗi khi import đề thi");
-    }
-})
-.WithName("ImportMockExam")
-.DisableAntiforgery();
+// 11. Đăng ký Controllers và gRPC Service
+app.MapControllers();
+app.MapGrpcService<ContentGrpcService>();
 
-// Endpoint lấy danh sách đề thi trong Database
-app.MapGet("/api/content/exams", async (IMediator mediator) =>
+// 12. Tự động kiểm tra & Seed đề thi chẩn đoán 30 câu khi khởi động
+using (var scope = app.Services.CreateScope())
 {
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
     try
     {
-        var exams = await mediator.Send(new GetMockExamsQuery());
-        return Results.Ok(exams);
+        var dbContext = services.GetRequiredService<ContentDbContext>();
+        await DiagnosticExamSeeder.SeedDiagnosticExamAsync(dbContext, logger);
     }
     catch (Exception ex)
     {
-        return Results.Problem(detail: ex.Message, statusCode: 500, title: "Lỗi khi lấy danh sách đề thi");
+        logger.LogError(ex, "Lỗi khi chạy DiagnosticExamSeeder khởi tạo dữ liệu mẫu.");
     }
-})
-.WithName("GetMockExams");
-
-// Endpoint lấy chi tiết một đề thi theo ExamId
-app.MapGet("/api/content/exams/{id:guid}", async (Guid id, IMediator mediator) =>
-{
-    try
-    {
-        var exam = await mediator.Send(new GetMockExamByIdQuery(id));
-        if (exam == null)
-        {
-            return Results.NotFound(new { message = $"Không tìm thấy đề thi với ID: {id}" });
-        }
-        return Results.Ok(exam);
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem(detail: ex.Message, statusCode: 500, title: "Lỗi khi lấy chi tiết đề thi");
-    }
-})
-.WithName("GetMockExamById");
-
-// Endpoint xóa đề thi theo ExamId
-app.MapDelete("/api/content/exams/{id:guid}", async (Guid id, IMediator mediator) =>
-{
-    try
-    {
-        var success = await mediator.Send(new DeleteMockExamCommand(id));
-        if (!success)
-        {
-            return Results.NotFound(new { message = $"Không tìm thấy đề thi với ID: {id} để xóa" });
-        }
-        return Results.Ok(new { message = "Đã xóa đề thi thành công!", exam_id = id });
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem(detail: ex.Message, statusCode: 500, title: "Lỗi khi xóa đề thi");
-    }
-})
-.WithName("DeleteMockExam");
+}
 
 app.Run();
