@@ -1,5 +1,13 @@
 # NHẬT KÝ KIỂM TRẢ TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [22/09/2026] - Mở Rộng gRPC Answer Keys Trả Về SkillName & DomainName
+- **Cập Nhật `content.proto` & Server `ContentGrpcService`**:
+  - Thêm `skill_name`, `domain_id`, `domain_name` vào message `QuestionAnswerKey`.
+  - Nạp eager loading quan hệ `Question -> Skill -> Domain` trong `ContentGrpcService.GetExamAnswerKey`.
+- **Kiểm Thử**: Biên dịch Solution sạch 100% (**0 Error, 0 Warning**), khởi chạy dịch vụ cổng 5249/5250 sẵn sàng phục vụ Practice Service.
+
+---
+
 ## [20/09/2026] - Chuẩn Hóa Kiến Trúc Chuyên Nghiệp (Result Pattern, ErrorType, Controllers, Swagger UI), Đề Thi Chẩn Đoán 30 Câu & gRPC Server
 - **Chuẩn Hóa Kiến Trúc Giống Identity Service (`Application Layer`)**:
   - Triển khai **Result Pattern**: [`Error.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Application/Common/Models/Error.cs) (hỗ trợ `ErrorType` từ Validation, NotFound, Conflict, Failure, Unauthorized đến Forbidden) và [`Result.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Application/Common/Models/Result.cs).

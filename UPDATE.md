@@ -1,5 +1,11 @@
 # Nhật Ký Cập Nhật (Update Log) - Content Service
 
+## [22/09/2026] - Bổ Sung Thông Tin Kỹ Năng & Miền Năng Lực Trực Quan Vào gRPC Answer Keys
+- **Nâng Cấp Hợp Đồng `content.proto` & Server `ContentGrpcService`**:
+  - Mở rộng thông điệp `QuestionAnswerKey`: bổ sung 3 trường `skill_name`, `domain_id` và `domain_name`.
+  - Tối ưu hóa truy vấn EF Core trong `ContentGrpcService.GetExamAnswerKey`: nạp kèm thông tin quan hệ (`Include(eq => eq.Question).ThenInclude(q => q.Skill).ThenInclude(s => s.Domain)`) trả về tên kỹ năng và tên môn học tiếng Việt trực quan cho `Practice_Service`.
+- **Kiểm Thử Vận Hành**: Biên dịch sạch 0 Error, 0 Warning.
+
 ## [20/09/2026] - Chuẩn Hóa Kiến Trúc Chuyên Nghiệp (Result Pattern, ErrorType, Controllers, Swagger UI), Đề Thi Chẩn Đoán 30 Câu & gRPC Server
 - **Chuẩn Hóa Báo Lỗi & Result Pattern (Đồng Bộ Identity Service)**:
   - Triển khai `Result<T>` và `Error` (`ErrorType`: `Validation`, `NotFound`, `Conflict`, `Failure`, `Unauthorized`, `Forbidden`).

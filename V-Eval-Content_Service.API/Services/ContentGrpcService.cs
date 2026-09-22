@@ -28,6 +28,8 @@ public class ContentGrpcService : ContentService.ContentServiceBase
         var examQuestions = await _context.ExamQuestions
             .AsNoTracking()
             .Include(eq => eq.Question)
+                .ThenInclude(q => q.Skill)
+                    .ThenInclude(s => s.Domain)
             .Where(eq => eq.ExamId == examId)
             .OrderBy(eq => eq.QuestionOrder)
             .ToListAsync(context.CancellationToken);
@@ -50,7 +52,10 @@ public class ContentGrpcService : ContentService.ContentServiceBase
                 QuestionOrder = eq.QuestionOrder,
                 CorrectOption = eq.Question.CorrectOption.ToString(),
                 SkillId = eq.Question.SkillId.ToString(),
-                DifficultyLevel = eq.Question.DifficultyLevel
+                DifficultyLevel = eq.Question.DifficultyLevel,
+                SkillName = eq.Question.Skill?.Name ?? string.Empty,
+                DomainId = eq.Question.Skill?.DomainId.ToString() ?? string.Empty,
+                DomainName = eq.Question.Skill?.Domain?.Name ?? string.Empty
             });
         }
 
