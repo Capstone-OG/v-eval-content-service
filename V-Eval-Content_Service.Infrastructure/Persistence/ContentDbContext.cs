@@ -20,8 +20,8 @@ namespace V_Eval_Content_Service.Infrastructure.Persistence
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // Thiết lập Default Schema là "content"
-            modelBuilder.HasDefaultSchema("content");
+            // Thiết lập Default Schema là "v_eval_content"
+            modelBuilder.HasDefaultSchema("v_eval_content");
 
             // Cấu hình CompetencyDomain
             modelBuilder.Entity<CompetencyDomain>(entity =>
