@@ -1,5 +1,17 @@
 # NHẬT KÝ KIỂM TRẢ TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [24/09/2026] - Bổ Sung Route Aliases `/api/content/exams` & Tối Ưu HTTPS Redirection Pipeline
+- **Bổ Sung Route AliasesSong Song (`MockExamsController` & `DiagnosticController`)**:
+  - Đã thêm `[Route("api/content/exams")]` song song với `[Route("api/v1/content/exams")]` cho `MockExamsController`.
+  - Đã thêm `[Route("api/content")]` song song với `[Route("api/v1/content")]` cho `DiagnosticController`.
+  - Khắc phục hoàn toàn lỗi `404 (Not Found)` khi Web Viewer gọi `GET http://localhost:5249/api/content/exams`.
+- **Cấu Hình HTTP Pipeline (`Program.cs`)**:
+  - Tối ưu hóa `app.UseHttpsRedirection()` chỉ áp dụng khi không ở môi trường `Development`, loại bỏ cảnh báo `Failed to determine the https port for redirect` khi chạy Kestrel trên HTTP port `5249` (REST/Swagger) và port `5250` (gRPC Server).
+- **Kiểm Thử & Khởi Chạy**:
+  - Xử lý triệt để lỗi kết lộ route 404 cho Web Client và sẵn sàng phục vụ bài thi chẩn đoán 30 câu.
+
+---
+
 ## [22/09/2026] - Mở Rộng gRPC Answer Keys Trả Về SkillName & DomainName
 - **Cập Nhật `content.proto` & Server `ContentGrpcService`**:
   - Thêm `skill_name`, `domain_id`, `domain_name` vào message `QuestionAnswerKey`.

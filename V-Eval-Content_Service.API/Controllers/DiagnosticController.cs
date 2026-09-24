@@ -6,6 +6,7 @@ using V_Eval_Content_Service.Application.Diagnostic.Queries.GetDiagnosticTest;
 namespace V_Eval_Content_Service.API.Controllers;
 
 [Route("api/v1/content")]
+[Route("api/content")]
 public class DiagnosticController : ApiControllerBase
 {
     /// <summary>
