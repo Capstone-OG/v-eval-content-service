@@ -39,6 +39,9 @@ namespace V_Eval_Content_Service.Application.MockExams.Queries.GetMockExamById
         [JsonPropertyName("created_at")]
         public DateTime CreatedAt { get; set; }
 
+        [JsonPropertyName("created_at_vn")]
+        public string CreatedAtVn => CreatedAt.AddHours(7).ToString("dd/MM/yyyy HH:mm:ss");
+
         [JsonPropertyName("passages")]
         public List<ExamPassageDto> Passages { get; set; } = new();
 

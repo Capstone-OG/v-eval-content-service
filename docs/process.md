@@ -44,4 +44,7 @@
 | 13 | **Seeding Đề Chẩn Đoán Mẫu** | `Infrastructure/Persistence/Seeds/DiagnosticExamSeeder.cs` | 🟢 Hoàn thành | 100% | Tự động tạo đề 30 câu khi app khởi động |
 | 14 | **Swagger UI Trực Quan** | `API/Program.cs` | 🟢 Hoàn thành | 100% | Giao diện Swagger phân nhóm tại `:5249/swagger` |
 | 15 | **gRPC Server (Chấm Điểm)** | `API/Services/ContentGrpcService.cs` | 🟢 Hoàn thành | 100% | RPC `GetExamAnswerKey` phục vụ Practice Service |
-| 16 | **Ngân Hàng Câu Hỏi Tự Sinh AI**| `Features/Questions/` | 🟡 Đang chờ | 0% | Phát triển tích hợp với AI Engine RAG |
+| 16 | **Ngân Hàng Câu Hỏi Tự Sinh AI**| `API/Controllers/MockExamsController.cs` | 🟢 Hoàn thành | 100% | Nhận đề sinh từ AI Engine qua `POST /api/v1/content/exams/import` |
+| 17 | **Phê Duyệt & Xuất Bản Đề Thi** | `Application/MockExams/Commands/PublishMockExam/` | 🟢 Hoàn thành | 100% | `PublishMockExamCommand`, route `PATCH /api/v1/content/exams/{id}/publish` |
+| 18 | **Chuẩn Hóa Bloom 6 Cấp Độ** | `Domain/Constants/BloomTaxonomy.cs` | 🟢 Hoàn thành | 100% | Revised Bloom's Taxonomy 6 cấp độ định lượng độ khó câu hỏi |
+| 19 | **Chuẩn Hóa Múi Giờ Việt Nam** | `API/Controllers/MockExamsController.cs` & DTOs | 🟢 Hoàn thành | 100% | Role timezone `Asia/Ho_Chi_Minh`, trường `createdAtVn` format chuẩn |
