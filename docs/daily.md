@@ -1,5 +1,20 @@
 # NHẬT KÝ KIỂM TRẢ TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [27/09/2026] - Chuẩn Hóa Thang Đo Tư Duy Bloom 6 Cấp & Bổ Sung Endpoint Phê Duyệt Xuất Bản Đề Thi (Publish MockExam)
+- **Chuẩn Hóa Thang Đo Tư Duy Bloom 6 Mức Độ Cho Ngân Hàng Câu Hỏi**:
+  - Khởi tạo class `BloomTaxonomy.cs` định nghĩa 6 mức độ nhận thức: 1. Nhận biết (Remembering), 2. Thông hiểu (Understanding), 3. Vận dụng (Applying), 4. Phân tích (Analyzing), 5. Đánh giá (Evaluating), 6. Sáng tạo (Creating).
+  - Đồng bộ hoá toàn diện quy ước độ khó câu hỏi phục vụ các truy vấn phân tích chẩn đoán (Diagnostic Test) và trích xuất đáp án gRPC (`GetExamAnswerKey`).
+- **Bổ Sung Command Phê Duyệt & Xuất Bản Đề Thi (`PublishMockExamCommand`)**:
+  - Đề thi import vào CSDL Supabase PostgreSQL qua `POST /api/v1/content/exams/import` mặc định mang trạng thái **`IsPublished = false` (Chờ duyệt / Pending Approval)**.
+  - Xây dựng `PublishMockExamCommand` và handler cập nhật trạng thái `IsPublished = true` (Đã duyệt / Published).
+  - Cung cấp 2 route: `PATCH /api/v1/content/exams/{id}/publish` và `PUT /api/v1/content/exams/{id}/publish` trong `MockExamsController`.
+- **Chuẩn Hóa Múi Giờ Việt Nam (Asia/Ho_Chi_Minh UTC+7) Cho CSDL & API**:
+  - Cấu hình server role CSDL Supabase PostgreSQL: `ALTER ROLE postgres SET timezone TO 'Asia/Ho_Chi_Minh';` giúp toàn bộ truy vấn SQL trả về trực tiếp giờ Việt Nam (`+07:00`) thay vì UTC.
+  - Bổ sung trường `createdAtVn` trong `MockExamSummaryDto` và `MockExamDetailDto` tự động định dạng chuẩn ngày giờ Việt Nam (`dd/MM/yyyy HH:mm:ss`), đảm bảo hiển thị đúng ngày hôm nay `27/09/2026`.
+- **Kiểm Thử Biên Dịch**: `dotnet build` giải pháp `V-Eval-Content_Service.sln` đạt **0 Error(s), 0 Warning(s)**, gọi test PATCH thành công trả về `{ is_published: true }`, API trả về `createdAtVn: 27/09/2026 03:16:47`.
+
+---
+
 ## [24/09/2026] - Bổ Sung Route Aliases `/api/content/exams` & Tối Ưu HTTPS Redirection Pipeline
 - **Bổ Sung Route AliasesSong Song (`MockExamsController` & `DiagnosticController`)**:
   - Đã thêm `[Route("api/content/exams")]` song song với `[Route("api/v1/content/exams")]` cho `MockExamsController`.

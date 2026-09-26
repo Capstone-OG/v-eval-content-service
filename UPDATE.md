@@ -1,10 +1,18 @@
 # Nhật Ký Cập Nhật (Update Log) - Content Service
 
-## [24/09/2026] - Bổ Sung Route Aliases `/api/content/exams` & Xử Lý Dịch Vụ Content Service
+## [27/09/2026] - Chuẩn Hóa Bloom 6 Cấp Độ & Triển Khai Lệnh Phê Duyệt Đề Thi (PublishMockExamCommand)
 
-- **Khắc Phục Lỗi 404 Route Mismatch (`MockExamsController` & `DiagnosticController`)**:
-  - Bổ sung Route Alias `[Route("api/content/exams")]` song song với `[Route("api/v1/content/exams")]` cho `MockExamsController`.
-  - Bổ sung Route Alias `[Route("api/content")]` song song với `[Route("api/v1/content")]` cho `DiagnosticController`.
-  - Giúp Web Client / AI Engine Web Viewer gọi `GET http://localhost:5249/api/content/exams` thành công 100% (không còn bị HTTP 404).
-- **Cấu Hình HTTP Kestrel & Pipeline (`Program.cs`)**: Tắt `app.UseHttpsRedirection()` ở môi trường Development để tránh kẹt middleware HTTPS redirect khi chạy HTTP/1.1 (port 5249) và HTTP/2 gRPC (port 5250).
-- **Tự Động Seed Dữ Liệu**: Tự động nạp đề thi chẩn đoán 30 câu vào Supabase PostgreSQL schema `v_eval_content`.
+- **Chuẩn Hóa Thang Đo Tư Duy Bloom 6 Cấp Độ**:
+  - Khởi tạo class [`BloomTaxonomy.cs`](./V-Eval-Content_Service.Domain/Constants/BloomTaxonomy.cs) định nghĩa 6 mức độ nhận thức:
+    1. `Remembering = 1`: Nhận biết
+    2. `Understanding = 2`: Thông hiểu
+    3. `Applying = 3`: Vận dụng
+    4. `Analyzing = 4`: Phân tích
+    5. `Evaluating = 5`: Đánh giá
+    6. `Creating = 6`: Sáng tạo
+  - Đồng bộ hoá toàn diện quy ước độ khó câu hỏi phục vụ các truy vấn phân tích chẩn đoán (Diagnostic Test) và trích xuất đáp án gRPC (`GetExamAnswerKey`).
+- **Triển Khai Command Phê Duyệt Đề Thi (`PublishMockExamCommand`)**:
+  - Khi lưu đề thi từ AI Engine (`POST /api/v1/content/exams/import`), đề thi được lưu mặc định với trạng thái `IsPublished = false` (Chờ duyệt / Pending Approval).
+  - Triển khai use case `PublishMockExamCommand` và `PublishMockExamCommandHandler` xác thực sự tồn tại của đề thi và cập nhật trạng thái `IsPublished = true` (Đã duyệt / Published).
+- **Kiểm Thử Biên Dịch**:
+  - `dotnet build` giải pháp `V-Eval-Content_Service.sln` đạt **0 Error(s), 0 Warning(s)**.
