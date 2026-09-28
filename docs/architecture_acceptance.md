@@ -26,6 +26,9 @@
 ## 4. ACCEPTANCE & VERIFICATION RESULTS
 - **Compilation**: Clean build (`dotnet build`) with 0 warnings, 0 errors.
 - **Seeding Verification**: Automated seeder generates diagnostic 30-question mock exam, seeds 12 standard skills and 9 DAG prerequisite edges on startup.
-- **API & gRPC Functional Tests**: Verified `GET /api/v1/content/diagnostic-test`, `GetExamAnswerKey`, and `GetSkillsTree`.
+- **API & gRPC Functional Tests**: Verified `GET /api/v1/content/diagnostic-test` (including `excludeExamId`), `GetExamAnswerKey`, and `GetSkillsTree`.
+- **Exam Publish Endpoint**: Verified `PATCH /api/v1/content/exams/{id}/publish` updating `is_published = true`.
+- **Cognitive Taxonomy Standardization**: Domain constants class `BloomTaxonomy.cs` mapping 6 Revised Bloom levels.
+- **Vietnam Timezone Standardization**: Role timezone `Asia/Ho_Chi_Minh` and computed `createdAtVn` property returning formatted `dd/MM/yyyy HH:mm:ss`.
 - **Swagger Documentation**: Interactive OpenAPI / Swagger UI ready at `http://localhost:5249/swagger`.
 

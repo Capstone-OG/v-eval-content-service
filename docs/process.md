@@ -46,4 +46,7 @@
 | 15 | **gRPC Server (Chấm Điểm)** | `API/Services/ContentGrpcService.cs` | 🟢 Hoàn thành | 100% | RPC `GetExamAnswerKey` phục vụ Practice Service |
 | 16 | **SkillPrerequisites & DAG Seeding** | `Domain/Entities/SkillPrerequisite.cs` & `Infrastructure/Persistence/Seeds/SkillPrerequisiteSeeder.cs` | 🟢 Hoàn thành | 100% | Entity bảng nối, cấu hình Fluent API, seed 12 kỹ năng chuẩn và 9 cung DAG |
 | 17 | **gRPC RPC GetSkillsTree** | `API/Services/ContentGrpcService.cs` | 🟢 Hoàn thành | 100% | RPC `GetSkillsTree` cung cấp cấu trúc Cây khung năng lực cho Practice Service |
-| 18 | **Ngân Hàng Câu Hỏi Tự Sinh AI**| `Features/Questions/` | 🟡 Đang chờ | 0% | Phát triển tích hợp với AI Engine RAG |
+| 18 | **Ngân Hàng Câu Hỏi Tự Sinh AI**| `API/Controllers/MockExamsController.cs` | 🟢 Hoàn thành | 100% | Nhận đề sinh từ AI Engine qua `POST /api/v1/content/exams/import` |
+| 19 | **Phê Duyệt & Xuất Bản Đề Thi** | `Application/MockExams/Commands/PublishMockExam/` | 🟢 Hoàn thành | 100% | `PublishMockExamCommand`, route `PATCH /api/v1/content/exams/{id}/publish` |
+| 20 | **Chuẩn Hóa Bloom 6 Cấp Độ** | `Domain/Constants/BloomTaxonomy.cs` | 🟢 Hoàn thành | 100% | Revised Bloom's Taxonomy 6 cấp độ định lượng độ khó câu hỏi |
+| 21 | **Chuẩn Hóa Múi Giờ Việt Nam** | `API/Controllers/MockExamsController.cs` & DTOs | 🟢 Hoàn thành | 100% | Role timezone `Asia/Ho_Chi_Minh`, trường `createdAtVn` format chuẩn |

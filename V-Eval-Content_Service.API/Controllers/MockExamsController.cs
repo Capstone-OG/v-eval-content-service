@@ -3,6 +3,7 @@ using V_Eval_Content_Service.API.Controllers.Base;
 using V_Eval_Content_Service.Application.Common.Models;
 using V_Eval_Content_Service.Application.MockExams.Commands.DeleteMockExam;
 using V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam;
+using V_Eval_Content_Service.Application.MockExams.Commands.PublishMockExam;
 using V_Eval_Content_Service.Application.MockExams.Queries.GetMockExamById;
 using V_Eval_Content_Service.Application.MockExams.Queries.GetMockExams;
 
@@ -54,6 +55,24 @@ public class MockExamsController : ApiControllerBase
             exam_id = examId,
             message = "Import đề thi thành công vào Supabase PostgreSQL!"
         });
+    }
+
+    /// <summary>
+    /// Phê duyệt và phát hành đề thi (Chuyển trạng thái từ Chờ duyệt sang Đã duyệt)
+    /// </summary>
+    [HttpPatch("{id:guid}/publish")]
+    [HttpPut("{id:guid}/publish")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PublishExam([FromRoute] Guid id)
+    {
+        var success = await Mediator.Send(new PublishMockExamCommand(id));
+        if (!success)
+        {
+            return HandleResult(Result.Failure(
+                Error.NotFound("Exam.NotFound", $"Không tìm thấy đề thi với ID: {id}")));
+        }
+        return Ok(new { message = "Đã phê duyệt và xuất bản đề thi thành công!", exam_id = id, is_published = true });
     }
 
     /// <summary>
