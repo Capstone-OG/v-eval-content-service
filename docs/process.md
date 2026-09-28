@@ -44,4 +44,6 @@
 | 13 | **Seeding Đề Chẩn Đoán Mẫu** | `Infrastructure/Persistence/Seeds/DiagnosticExamSeeder.cs` | 🟢 Hoàn thành | 100% | Tự động tạo đề 30 câu khi app khởi động |
 | 14 | **Swagger UI Trực Quan** | `API/Program.cs` | 🟢 Hoàn thành | 100% | Giao diện Swagger phân nhóm tại `:5249/swagger` |
 | 15 | **gRPC Server (Chấm Điểm)** | `API/Services/ContentGrpcService.cs` | 🟢 Hoàn thành | 100% | RPC `GetExamAnswerKey` phục vụ Practice Service |
-| 16 | **Ngân Hàng Câu Hỏi Tự Sinh AI**| `Features/Questions/` | 🟡 Đang chờ | 0% | Phát triển tích hợp với AI Engine RAG |
+| 16 | **SkillPrerequisites & DAG Seeding** | `Domain/Entities/SkillPrerequisite.cs` & `Infrastructure/Persistence/Seeds/SkillPrerequisiteSeeder.cs` | 🟢 Hoàn thành | 100% | Entity bảng nối, cấu hình Fluent API, seed 12 kỹ năng chuẩn và 9 cung DAG |
+| 17 | **gRPC RPC GetSkillsTree** | `API/Services/ContentGrpcService.cs` | 🟢 Hoàn thành | 100% | RPC `GetSkillsTree` cung cấp cấu trúc Cây khung năng lực cho Practice Service |
+| 18 | **Ngân Hàng Câu Hỏi Tự Sinh AI**| `Features/Questions/` | 🟡 Đang chờ | 0% | Phát triển tích hợp với AI Engine RAG |

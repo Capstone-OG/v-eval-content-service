@@ -12,6 +12,10 @@
   - Enforces strict anti-cheating by stripping correct options (`CorrectOption`) and detailed explanations (`Explanation`) on client responses.
 - **Inter-service gRPC (`content.proto`)**:
   - Implements `GetExamAnswerKey` RPC for secure server-to-server grading by `Practice_Service`.
+  - Implements `GetSkillsTree` RPC delivering the full competency skill tree and prerequisite dependencies (`prerequisite_ids`) for Path Planning.
+- **Core Flow 2 (Competency DAG & Skill Prerequisites)**:
+  - Supports DAG-based competency modeling with `SkillPrerequisites` table.
+  - Seeds the 12 standard VNU-HCM competency skills across 4 domains with test weights and 9 directed acyclic prerequisite relationships.
 
 ## 3. RELIABILITY & ERROR HANDLING STANDARDS
 - **Result Pattern (`Result<T>`, `Error`, `ErrorType`)**: Replaces raw exceptions with explicit functional domain results.
@@ -21,7 +25,7 @@
 
 ## 4. ACCEPTANCE & VERIFICATION RESULTS
 - **Compilation**: Clean build (`dotnet build`) with 0 warnings, 0 errors.
-- **Seeding Verification**: Automated seeder generates diagnostic 30-question mock exam on startup.
-- **API Functional Tests**: Verified `GET /api/v1/content/diagnostic-test` and 404 error formatting.
+- **Seeding Verification**: Automated seeder generates diagnostic 30-question mock exam, seeds 12 standard skills and 9 DAG prerequisite edges on startup.
+- **API & gRPC Functional Tests**: Verified `GET /api/v1/content/diagnostic-test`, `GetExamAnswerKey`, and `GetSkillsTree`.
 - **Swagger Documentation**: Interactive OpenAPI / Swagger UI ready at `http://localhost:5249/swagger`.
 

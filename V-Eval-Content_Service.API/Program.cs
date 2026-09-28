@@ -99,6 +99,7 @@ using (var scope = app.Services.CreateScope())
     {
         var dbContext = services.GetRequiredService<ContentDbContext>();
         await DiagnosticExamSeeder.SeedDiagnosticExamAsync(dbContext, logger);
+        await SkillPrerequisiteSeeder.SeedSkillsAndPrerequisitesAsync(dbContext, logger);
     }
     catch (Exception ex)
     {

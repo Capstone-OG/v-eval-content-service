@@ -17,6 +17,7 @@ namespace V_Eval_Content_Service.Infrastructure.Persistence
         public DbSet<Question> Questions { get; set; } = null!;
         public DbSet<MockExam> MockExams { get; set; } = null!;
         public DbSet<ExamQuestion> ExamQuestions { get; set; } = null!;
+        public DbSet<SkillPrerequisite> SkillPrerequisites { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -148,6 +149,25 @@ namespace V_Eval_Content_Service.Infrastructure.Persistence
                 entity.HasOne(d => d.Question)
                     .WithMany(p => p.ExamQuestions)
                     .HasForeignKey(d => d.QuestionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Cấu hình SkillPrerequisite (Quan hệ đồ thị DAG N-N)
+            modelBuilder.Entity<SkillPrerequisite>(entity =>
+            {
+                entity.ToTable("SkillPrerequisites");
+                entity.HasKey(e => new { e.SkillId, e.PrerequisiteId });
+                entity.Property(e => e.SkillId).HasColumnName("skill_id");
+                entity.Property(e => e.PrerequisiteId).HasColumnName("prerequisite_id");
+
+                entity.HasOne(d => d.Skill)
+                    .WithMany(p => p.Prerequisites)
+                    .HasForeignKey(d => d.SkillId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(d => d.PrerequisiteSkill)
+                    .WithMany(p => p.DependentSkills)
+                    .HasForeignKey(d => d.PrerequisiteId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
