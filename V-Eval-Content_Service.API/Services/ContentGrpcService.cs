@@ -16,6 +16,40 @@ public class ContentGrpcService : ContentService.ContentServiceBase
         _logger = logger;
     }
 
+    public override async Task<GetSkillsTreeResponse> GetSkillsTree(
+        GetSkillsTreeRequest request,
+        ServerCallContext context)
+    {
+        var skills = await _context.Skills
+            .AsNoTracking()
+            .Include(s => s.Prerequisites)
+            .Include(s => s.Domain)
+            .OrderBy(s => s.SkillId)
+            .ToListAsync(context.CancellationToken);
+
+        var response = new GetSkillsTreeResponse();
+
+        foreach (var s in skills)
+        {
+            var node = new SkillNode
+            {
+                SkillId = s.SkillId.ToString(),
+                Name = s.Name,
+                Description = s.Domain?.Name ?? string.Empty
+            };
+
+            foreach (var prereq in s.Prerequisites)
+            {
+                node.PrerequisiteIds.Add(prereq.PrerequisiteId.ToString());
+            }
+
+            response.Skills.Add(node);
+        }
+
+        _logger.LogInformation("Delivered skills tree with {Count} skills for path planning.", response.Skills.Count);
+        return response;
+    }
+
     public override async Task<GetExamAnswerKeyResponse> GetExamAnswerKey(
         GetExamAnswerKeyRequest request,
         ServerCallContext context)

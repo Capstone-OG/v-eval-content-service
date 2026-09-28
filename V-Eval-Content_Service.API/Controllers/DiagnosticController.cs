@@ -15,13 +15,14 @@ public class DiagnosticController : ApiControllerBase
     /// <remarks>
     /// API trả về cấu trúc đề thi gồm 30 câu hỏi theo định dạng chuẩn ĐGNL V-ACT.
     /// Toàn bộ đáp án đúng và lời giải chi tiết được ẩn hoàn toàn để chống gian lận.
+    /// Hỗ trợ tham số excludeExamId khi học sinh làm lại bài mới ngẫu nhiên (Unhappy Case 2).
     /// </remarks>
     [HttpGet("diagnostic-test")]
     [ProducesResponseType(typeof(DiagnosticExamDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetDiagnosticTest()
+    public async Task<IActionResult> GetDiagnosticTest([FromQuery] Guid? excludeExamId = null)
     {
-        var result = await Mediator.Send(new GetDiagnosticTestQuery());
+        var result = await Mediator.Send(new GetDiagnosticTestQuery(excludeExamId));
         return HandleResult(result);
     }
 }

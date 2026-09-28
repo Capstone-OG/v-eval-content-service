@@ -14,6 +14,7 @@ namespace V_Eval_Content_Service.Application.Common.Interfaces
         DbSet<Question> Questions { get; }
         DbSet<MockExam> MockExams { get; }
         DbSet<ExamQuestion> ExamQuestions { get; }
+        DbSet<SkillPrerequisite> SkillPrerequisites { get; }
 
         Task<int> SaveChangesAsync(CancellationToken cancellationToken);
     }
