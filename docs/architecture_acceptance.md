@@ -8,7 +8,7 @@
 ## 2. CORE RESPONSIBILITIES & MULTI-SCHEMA INTEGRATION
 - **Assessment Schema (`content`)**: Owns `mock_exams`, `exam_questions`, `passages`, `questions`, and `skills`.
 - **Core Flow 1 (Diagnostic Assessment Baseline)**:
-  - Serves 30-question diagnostic baseline exam via `GET /api/v1/content/diagnostic-test`.
+  - Serves 30-question diagnostic baseline exam via `GET /api/v1/content/diagnostic-test`, with `excludeExamId` query parameter support for randomized retakes when previous sessions expire (Unhappy Case 2).
   - Enforces strict anti-cheating by stripping correct options (`CorrectOption`) and detailed explanations (`Explanation`) on client responses.
 - **Inter-service gRPC (`content.proto`)**:
   - Implements `GetExamAnswerKey` RPC for secure server-to-server grading by `Practice_Service`.

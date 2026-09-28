@@ -7,7 +7,7 @@ using V_Eval_Content_Service.Domain.Entities;
 
 namespace V_Eval_Content_Service.Application.Diagnostic.Queries.GetDiagnosticTest;
 
-public record GetDiagnosticTestQuery : IRequest<Result<DiagnosticExamDto>>;
+public record GetDiagnosticTestQuery(Guid? ExcludeExamId = null) : IRequest<Result<DiagnosticExamDto>>;
 
 public class GetDiagnosticTestQueryHandler : IRequestHandler<GetDiagnosticTestQuery, Result<DiagnosticExamDto>>
 {
@@ -23,7 +23,7 @@ public class GetDiagnosticTestQueryHandler : IRequestHandler<GetDiagnosticTestQu
         CancellationToken cancellationToken)
     {
         // 1. Tìm đề thi chẩn đoán (ưu tiên ExamCategory = "DIAGNOSTIC")
-        var exam = await _context.MockExams
+        var query = _context.MockExams
             .AsNoTracking()
             .Include(e => e.ExamQuestions)
                 .ThenInclude(eq => eq.Question)
@@ -31,11 +31,34 @@ public class GetDiagnosticTestQueryHandler : IRequestHandler<GetDiagnosticTestQu
             .Include(e => e.ExamQuestions)
                 .ThenInclude(eq => eq.Question)
                     .ThenInclude(q => q.Skill)
-            .Where(e => e.ExamCategory == "DIAGNOSTIC")
+            .Where(e => e.ExamCategory == "DIAGNOSTIC");
+
+        if (request.ExcludeExamId.HasValue)
+        {
+            query = query.Where(e => e.ExamId != request.ExcludeExamId.Value);
+        }
+
+        var exam = await query
             .OrderByDescending(e => e.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // 2. Nếu chưa có đề gắn cờ DIAGNOSTIC, lấy đề mẫu đầu tiên làm fallback
+        // 2. Nếu có loại trừ đề nhưng không tìm thấy đề khác, fallback lấy đề chẩn đoán có sẵn
+        if (exam == null && request.ExcludeExamId.HasValue)
+        {
+            exam = await _context.MockExams
+                .AsNoTracking()
+                .Include(e => e.ExamQuestions)
+                    .ThenInclude(eq => eq.Question)
+                        .ThenInclude(q => q.Passage)
+                .Include(e => e.ExamQuestions)
+                    .ThenInclude(eq => eq.Question)
+                        .ThenInclude(q => q.Skill)
+                .Where(e => e.ExamCategory == "DIAGNOSTIC")
+                .OrderByDescending(e => e.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        // 3. Nếu chưa có đề gắn cờ DIAGNOSTIC, lấy đề mẫu đầu tiên làm fallback
         if (exam == null)
         {
             exam = await _context.MockExams

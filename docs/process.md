@@ -40,7 +40,7 @@
 | 9 | **Script Push Độc Lập** | `Scripts/push.bat` | 🟢 Hoàn thành | 100% | Hỗ trợ 3 chế độ push kèm kiểm tra lịch sử |
 | 10 | **Result Pattern & Error Handling** | `Application/Common/Models/` & `API/Controllers/Base/` | 🟢 Hoàn thành | 100% | Triển khai `Result<T>`, `ErrorType`, `ApiControllerBase` |
 | 11 | **Validation Pipeline Behavior** | `Application/Common/Behaviors/` | 🟢 Hoàn thành | 100% | `ValidationBehavior` tích hợp FluentValidation |
-| 12 | **Đề Thi Chẩn Đoán (30 câu V-ACT)** | `Application/Diagnostic/` & `API/Controllers/DiagnosticController.cs` | 🟢 Hoàn thành | 100% | `GET /api/v1/content/diagnostic-test` (Anti-cheat 100%) |
+| 12 | **Đề Thi Chẩn Đoán (30 câu V-ACT)** | `Application/Diagnostic/` & `API/Controllers/DiagnosticController.cs` | 🟢 Hoàn thành | 100% | `GET /api/v1/content/diagnostic-test` (Anti-cheat 100%, hỗ trợ `excludeExamId` Unhappy Case 2) |
 | 13 | **Seeding Đề Chẩn Đoán Mẫu** | `Infrastructure/Persistence/Seeds/DiagnosticExamSeeder.cs` | 🟢 Hoàn thành | 100% | Tự động tạo đề 30 câu khi app khởi động |
 | 14 | **Swagger UI Trực Quan** | `API/Program.cs` | 🟢 Hoàn thành | 100% | Giao diện Swagger phân nhóm tại `:5249/swagger` |
 | 15 | **gRPC Server (Chấm Điểm)** | `API/Services/ContentGrpcService.cs` | 🟢 Hoàn thành | 100% | RPC `GetExamAnswerKey` phục vụ Practice Service |
