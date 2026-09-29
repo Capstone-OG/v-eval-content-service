@@ -36,7 +36,9 @@ public class ContentGrpcService : ContentService.ContentServiceBase
                 SkillId = s.SkillId.ToString(),
                 Name = s.Name,
                 Description = s.Domain?.Name ?? string.Empty,
-                Weight = s.Weight ?? 0.05
+                Weight = s.Weight ?? 0.05,
+                DomainId = s.DomainId.ToString(),
+                DomainName = s.Domain?.Name ?? string.Empty
             };
 
             foreach (var prereq in s.Prerequisites)
