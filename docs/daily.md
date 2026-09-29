@@ -1,5 +1,14 @@
 # NHẬT KÝ KIỂM TRẢ TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [29/09/2026] - Bổ Sung Trọng Số Đề Thi (Weight) Vào gRPC Message SkillNode & RPC GetSkillsTree
+- **Mở Rộng Protocol Buffer & RPC GetSkillsTree**:
+  - Bổ sung trường `double weight = 5;` vào message `SkillNode` trong `content.proto`.
+  - Cập nhật [`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs) truyền trực tiếp trọng số `s.Weight ?? 0.05` cho từng kỹ năng sang Practice Service phục vụ thuật toán Path Planning.
+- **Kiểm Thử Biên Dịch**:
+  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error**).
+
+---
+
 ## [28/09/2026] - Khởi Tạo Thực Thể SkillPrerequisites, Seeding DAG 12 Kỹ Năng & RPC GetSkillsTree (Core Flow 2 - Giai Đoạn 1)
 - **Thực Thể & CSDL SkillPrerequisites (Đồ Thị Tiên Quyết DAG)**:
   - Bổ sung entity [`SkillPrerequisite.cs`](../V-Eval-Content_Service.Domain/Entities/SkillPrerequisite.cs) với khóa chính phức hợp `(skill_id, prerequisite_id)` đại diện cho cung có hướng trong đồ thị DAG.
