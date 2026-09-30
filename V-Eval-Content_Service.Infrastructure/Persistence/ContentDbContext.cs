@@ -68,6 +68,7 @@ namespace V_Eval_Content_Service.Infrastructure.Persistence
                 entity.Property(e => e.Content).HasColumnName("content").IsRequired();
                 entity.Property(e => e.VideoUrl).HasColumnName("video_url");
                 entity.Property(e => e.FileUrl).HasColumnName("file_url");
+                entity.Property(e => e.DurationSeconds).HasColumnName("duration_seconds").HasDefaultValue(0);
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
 
                 entity.HasOne(d => d.Skill)
