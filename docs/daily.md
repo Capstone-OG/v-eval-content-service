@@ -1,5 +1,14 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [01/10/2026] - Nâng Cấp Core Flow 2 (Bước 2): Bổ Sung DomainCode Vào gRPC Protocol Buffer & RPC GetSkillsTree
+- **Cập Nhật Hợp Đồng gRPC ([`content.proto`](../V-Eval-Content_Service.API/Protos/content.proto))**:
+  - Mở rộng message `SkillNode` bổ sung trường dữ liệu `string domain_code = 8;`.
+- **Cập Nhật Xử Lý gRPC Server ([`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
+  - Trong RPC `GetSkillsTree`: Ánh xạ tự động mã miền chuẩn (`DOM_LANG`, `DOM_MATH`, `DOM_NAT_SCI`, `DOM_SOC_SCI`) theo `DomainId` và tên miền của từng kỹ năng trong đồ thị DAG.
+  - Cung cấp dữ liệu mã miền đồng bộ trực tiếp cho Practice Service phục vụ phân cụm K-Means và phân nhóm chặng học lộ trình (Stages).
+- **Kiểm Thử Biên Dịch**:
+  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error**).
+
 ## [30/09/2026] - Triển Khai Hoàn Thiện APIs 20, 21: Quản Trị Bài Giảng Video Lý Thuyết & Phân Công Nhiệm Vụ APIs 16-19 Cho ThinhTT
 - **API 20: Tạo Mới Bài Giảng Video Lý Thuyết Chuẩn Theo Kỹ Năng (`POST /api/v1/content/materials`)**:
   - Khởi tạo DTOs [`MaterialDtos.cs`](../V-Eval-Content_Service.Application/Materials/DTOs/MaterialDtos.cs): `CreateMaterialRequestDto`, `MaterialDetailDto`, `MaterialItemDto`.

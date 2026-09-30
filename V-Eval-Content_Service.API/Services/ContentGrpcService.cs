@@ -32,6 +32,19 @@ public class ContentGrpcService : ContentService.ContentServiceBase
 
         foreach (var s in skills)
         {
+            string domainCode = s.DomainId.ToString().ToLowerInvariant() switch
+            {
+                "b581ee4c-7277-4be8-a156-c5b20a0a59f6" => "DOM_LANG",
+                "6f3765db-943e-4810-bf74-d6a8bdc215da" => "DOM_MATH",
+                "77777777-7777-7777-7777-000000000001" => "DOM_NAT_SCI",
+                "77777777-7777-7777-7777-000000000002" => "DOM_SOC_SCI",
+                _ => !string.IsNullOrEmpty(s.Domain?.Name) && s.Domain.Name.Contains("Ngôn ngữ", StringComparison.OrdinalIgnoreCase) ? "DOM_LANG"
+                   : !string.IsNullOrEmpty(s.Domain?.Name) && s.Domain.Name.Contains("Toán", StringComparison.OrdinalIgnoreCase) ? "DOM_MATH"
+                   : !string.IsNullOrEmpty(s.Domain?.Name) && s.Domain.Name.Contains("tự nhiên", StringComparison.OrdinalIgnoreCase) ? "DOM_NAT_SCI"
+                   : !string.IsNullOrEmpty(s.Domain?.Name) && s.Domain.Name.Contains("xã hội", StringComparison.OrdinalIgnoreCase) ? "DOM_SOC_SCI"
+                   : "DOM_UNKNOWN"
+            };
+
             var node = new SkillNode
             {
                 SkillId = s.SkillId.ToString(),
@@ -39,7 +52,8 @@ public class ContentGrpcService : ContentService.ContentServiceBase
                 Description = s.Domain?.Name ?? string.Empty,
                 Weight = s.Weight ?? 0.05,
                 DomainId = s.DomainId.ToString(),
-                DomainName = s.Domain?.Name ?? string.Empty
+                DomainName = s.Domain?.Name ?? string.Empty,
+                DomainCode = domainCode
             };
 
             foreach (var prereq in s.Prerequisites)

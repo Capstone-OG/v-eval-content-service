@@ -56,5 +56,6 @@
 | 25 | **Core Flow 2 - API 19: Đóng Gói Bộ Đề Quiz Củng Cố**| `Features/Exams/Commands/CreateQuizExam/` | 🟡 Chưa thực hiện | 0% | **Phụ trách: ThinhTT**. `POST /api/content/exams/quiz` đóng gói đề Quiz 5-10 câu gắn với SkillId |
 | 26 | **Core Flow 2 - API 20: Tạo Bài Giảng Video Lý Thuyết** | `MaterialsController.cs` & `CreateMaterialCommandHandler.cs` | 🟢 Hoàn thành | 100% | `POST /api/content/materials` tạo và liên kết bài giảng video lý thuyết chuẩn (`Title`, `VideoUrl`, `DurationSeconds`) |
 | 27 | **Core Flow 2 - API 21: Tra Cứu Video Bài Giảng Kỹ Năng**| `MaterialsController.cs` & `GetMaterialsBySkillQueryHandler.cs` | 🟢 Hoàn thành | 100% | `GET /api/content/materials/by-skill/{skillId}` tra cứu video bài giảng lý thuyết theo kỹ năng chặng học |
+| 28 | **Core Flow 2 (Thematic Cohort - Bước 2): Bổ Sung DomainCode Vào gRPC GetSkillsTree** | `Protos/content.proto` & `API/Services/ContentGrpcService.cs` | 🟢 Hoàn thành | 100% | Mở rộng message `SkillNode` bổ sung `domain_code`, ánh xạ mã miền chuẩn cho 12 kỹ năng DAG |
 
 
