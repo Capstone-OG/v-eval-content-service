@@ -1,4 +1,21 @@
-# NHẬT KÝ KIỂM TRẢ TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
+# NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
+
+## [30/09/2026] - Phân Công Nhiệm Vụ Triển Khai Giai Đoạn 4: Quản Trị Ngân Hàng Câu Hỏi & Bộ Đề Quiz Củng Cố (APIs 16, 17, 18, 19)
+- **Giao Việc Phụ Trách Kỹ Thuật (Assignee: ThinhTT)**:
+  - **API 16: Thêm Mới Câu Hỏi Trắc Nghiệm Gốc (`POST /api/v1/content/questions`)**:
+    - **Nhiệm vụ**: Tiếp nhận dữ liệu câu hỏi từ Giám đốc chuyên môn (Academic Director). Hỗ trợ nội dung công thức toán LaTeX, 4 lựa chọn (A, B, C, D), chỉ định đáp án đúng, lời giải thích chi tiết, gắn với mã kỹ năng `SkillId` và gán thang đo độ khó chuẩn Bloom 6 cấp độ (1-6).
+    - **Người phụ trách**: **ThinhTT**.
+  - **API 17: Hiệu Đính Nội Dung Câu Hỏi (`PUT /api/v1/content/questions/{questionId}`)**:
+    - **Nhiệm vụ**: Cho phép chỉnh sửa nội dung LaTeX, đáp án đúng, lời giải chi tiết hoặc điều chỉnh mức độ Bloom khi phát hiện sai sót chuyên môn trong ngân hàng câu hỏi.
+    - **Người phụ trách**: **ThinhTT**.
+  - **API 18: Xóa Hoặc Vô Hiệu Hóa Câu Hỏi (`DELETE /api/v1/content/questions/{questionId}`)**:
+    - **Nhiệm vụ**: Thực hiện xóa mềm hoặc vô hiệu hóa câu hỏi khi không còn phù hợp với ngân hàng đề, bảo toàn tính toàn vẹn dữ liệu cho các bài thi lịch sử đã nộp.
+    - **Người phụ trách**: **ThinhTT**.
+  - **API 19: Đóng Gói Bộ Đề Quiz Củng Cố Chuyên Đề (`POST /api/v1/content/exams/quiz`)**:
+    - **Nhiệm vụ**: Đóng gói và phát hành bộ đề Quiz củng cố chuyên đề chuẩn hóa (5-10 câu hỏi) gắn với `SkillId` (`IsPublished = true`). Cung cấp `QuizExamId` và bảng đáp án bảo mật qua gRPC cho Practice Service để vận hành chặng học Core Flow 2.
+    - **Người phụ trách**: **ThinhTT**.
+
+---
 
 ## [29/09/2026] - Bổ Sung Trọng Số Đề Thi (Weight) Và Thông Tin Miền Năng Lực (DomainId, DomainName) Vào gRPC Message SkillNode & RPC GetSkillsTree
 - **Mở Rộng Protocol Buffer & RPC GetSkillsTree**:

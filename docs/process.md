@@ -50,3 +50,10 @@
 | 19 | **Phê Duyệt & Xuất Bản Đề Thi** | `Application/MockExams/Commands/PublishMockExam/` | 🟢 Hoàn thành | 100% | `PublishMockExamCommand`, route `PATCH /api/v1/content/exams/{id}/publish` |
 | 20 | **Chuẩn Hóa Bloom 6 Cấp Độ** | `Domain/Constants/BloomTaxonomy.cs` | 🟢 Hoàn thành | 100% | Revised Bloom's Taxonomy 6 cấp độ định lượng độ khó câu hỏi |
 | 21 | **Chuẩn Hóa Múi Giờ Việt Nam** | `API/Controllers/MockExamsController.cs` & DTOs | 🟢 Hoàn thành | 100% | Role timezone `Asia/Ho_Chi_Minh`, trường `createdAtVn` format chuẩn |
+| 22 | **Core Flow 2 - API 16: Thêm Câu Hỏi Ngân Hàng Gốc** | `Features/Questions/Commands/CreateQuestion/` | 🟡 Chưa thực hiện | 0% | **Phụ trách: ThinhTT**. `POST /api/v1/content/questions` thêm câu hỏi trắc nghiệm (LaTeX, Bloom 1-6, SkillId) |
+| 23 | **Core Flow 2 - API 17: Hiệu Đính Nội Dung Câu Hỏi** | `Features/Questions/Commands/UpdateQuestion/` | 🟡 Chưa thực hiện | 0% | **Phụ trách: ThinhTT**. `PUT /api/v1/content/questions/{id}` sửa nội dung, đáp án, lời giải |
+| 24 | **Core Flow 2 - API 18: Xóa / Vô Hiệu Hóa Câu Hỏi** | `Features/Questions/Commands/DeleteQuestion/` | 🟡 Chưa thực hiện | 0% | **Phụ trách: ThinhTT**. `DELETE /api/v1/content/questions/{id}` xóa/vô hiệu hóa câu hỏi sai sót |
+| 25 | **Core Flow 2 - API 19: Đóng Gói Bộ Đề Quiz Củng Cố**| `Features/Exams/Commands/CreateQuizExam/` | 🟡 Chưa thực hiện | 0% | **Phụ trách: ThinhTT**. `POST /api/v1/content/exams/quiz` đóng gói đề Quiz 5-10 câu gắn với SkillId |
+| 26 | **Core Flow 2 - API 20: Tạo Bài Giảng Video Lý Thuyết** | `Features/Materials/Commands/CreateMaterial/` | 🟡 Chưa thực hiện | 0% | `POST /api/v1/content/materials` tạo và liên kết bài giảng video lý thuyết chuẩn |
+| 27 | **Core Flow 2 - API 21: Tra Cứu Video Bài Giảng Kỹ Năng**| `Features/Materials/Queries/GetMaterialBySkill/` | 🟡 Chưa thực hiện | 0% | `GET /api/v1/content/materials/by-skill/{skillId}` tra cứu video bài giảng lý thuyết theo kỹ năng chặng |
+
