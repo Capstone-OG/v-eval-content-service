@@ -9,7 +9,6 @@ using V_Eval_Content_Service.Application.MockExams.Queries.GetMockExams;
 
 namespace V_Eval_Content_Service.API.Controllers;
 
-[Route("api/v1/content/exams")]
 [Route("api/content/exams")]
 public class MockExamsController : ApiControllerBase
 {

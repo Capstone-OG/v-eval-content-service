@@ -1,34 +1,27 @@
-# ARCHITECTURE ACCEPTANCE REPORT - CONTENT SERVICE
+# ARCHITECTURE ACCEPTANCE REPORT - V-EVAL CONTENT SERVICE
 
 ## 1. SERVICE OVERVIEW
-- **Service Name**: V-Eval Content Service (Assessment Bank & Exam Engine).
-- **Service Port**: `5249` (HTTP) / Container `v_eval_content_service`.
-- **Architectural Style**: Clean Architecture with MediatR CQRS, Result Pattern, and gRPC Server.
+- **Service Name**: V-Eval Content Service (Curriculum Graph, Question Bank & Learning Materials).
+- **Service Ports**: Port `5249` (REST HTTP/1) + Port `5250` (gRPC HTTP/2).
+- **Architectural Paradigm**: Clean Architecture with CQRS pattern (MediatR), FluentValidation, Result Pattern, EF Core targeting Supabase PostgreSQL schema `v_eval_content`.
 
-## 2. CORE RESPONSIBILITIES & MULTI-SCHEMA INTEGRATION
-- **Assessment Schema (`content`)**: Owns `mock_exams`, `exam_questions`, `passages`, `questions`, and `skills`.
-- **Core Flow 1 (Diagnostic Assessment Baseline)**:
-  - Serves 30-question diagnostic baseline exam via `GET /api/v1/content/diagnostic-test`, with `excludeExamId` query parameter support for randomized retakes when previous sessions expire (Unhappy Case 2).
-  - Enforces strict anti-cheating by stripping correct options (`CorrectOption`) and detailed explanations (`Explanation`) on client responses.
-- **Inter-service gRPC (`content.proto`)**:
-  - Implements `GetExamAnswerKey` RPC for secure server-to-server grading by `Practice_Service`.
-  - Implements `GetSkillsTree` RPC delivering the full competency skill tree and prerequisite dependencies (`prerequisite_ids`) for Path Planning.
-- **Core Flow 2 (Competency DAG & Skill Prerequisites)**:
-  - Supports DAG-based competency modeling with `SkillPrerequisites` table.
-  - Seeds the 12 standard VNU-HCM competency skills across 4 domains with test weights and 9 directed acyclic prerequisite relationships.
+---
 
-## 3. RELIABILITY & ERROR HANDLING STANDARDS
-- **Result Pattern (`Result<T>`, `Error`, `ErrorType`)**: Replaces raw exceptions with explicit functional domain results.
-- **Validation Pipeline**: FluentValidation integrated via MediatR `ValidationBehavior` to intercept invalid payloads.
-- **Unified Base Controller (`ApiControllerBase`)**: Standardizes HTTP status codes and RFC 7807 ProblemDetails format.
-- **Global Exception Middleware**: Catches unhandled runtime errors returning structured JSON.
+## 2. SYSTEM ARCHITECTURE & INTER-SERVICE COMMUNICATION
+- **gRPC Server ([`content.proto`](../V-Eval-Content_Service.API/Protos/content.proto))**:
+  - `GetExamAnswerKey`: Server-to-server validation providing official tamper-proof answer keys for grading diagnostic submissions and milestone quizzes.
+  - `GetSkillsTree`: Returns the full Directed Acyclic Graph (DAG) of 12 standard V-ACT competencies, prerequisite relationships (`prerequisite_ids`), test weights, domain mappings (`domain_id`, `domain_name`), and standardized domain identifiers (`domain_code`).
+  - `GetQuestionsByDifficulty`: Supplies randomized question sets filtered by competency and difficulty level.
 
-## 4. ACCEPTANCE & VERIFICATION RESULTS
-- **Compilation**: Clean build (`dotnet build`) with 0 warnings, 0 errors.
-- **Seeding Verification**: Automated seeder generates diagnostic 30-question mock exam, seeds 12 standard skills and 9 DAG prerequisite edges on startup.
-- **API & gRPC Functional Tests**: Verified `GET /api/v1/content/diagnostic-test` (including `excludeExamId`), `GetExamAnswerKey`, and `GetSkillsTree`.
-- **Exam Publish Endpoint**: Verified `PATCH /api/v1/content/exams/{id}/publish` updating `is_published = true`.
-- **Cognitive Taxonomy Standardization**: Domain constants class `BloomTaxonomy.cs` mapping 6 Revised Bloom levels.
-- **Vietnam Timezone Standardization**: Role timezone `Asia/Ho_Chi_Minh` and computed `createdAtVn` property returning formatted `dd/MM/yyyy HH:mm:ss`.
-- **Swagger Documentation**: Interactive OpenAPI / Swagger UI ready at `http://localhost:5249/swagger`.
+---
 
+## 3. THEMATIC COHORT ARCHITECTURE SUPPORT (CORE FLOW 2 UPGRADE - STEP 2)
+- **Domain Identification Contract**:
+  - Added `string domain_code = 8;` to `SkillNode` message in `content.proto`.
+  - Mapped canonical domain codes in `ContentGrpcService.cs`:
+    - `DOM_LANG`: Vietnamese and English language arts (Domain `b581ee4c-7277-4be8-a156-c5b20a0a59f6`).
+    - `DOM_MATH`: Mathematics, logical deduction, and quantitative data analysis (Domain `6f3765db-943e-4810-bf74-d6a8bdc215da`).
+    - `DOM_NAT_SCI`: Natural sciences comprising Physics, Chemistry, Biology (Domain `77777777-7777-7777-7777-000000000001`).
+    - `DOM_SOC_SCI`: Social sciences comprising History, Geography (Domain `77777777-7777-7777-7777-000000000002`).
+- **Downstream Enabling**: Allows Practice Service to run K-Means cluster attribution and group roadmap nodes by domain cleanly without hardcoded heuristics.
+- **Verification**: Clean compilation (**0 Warning, 0 Error**).

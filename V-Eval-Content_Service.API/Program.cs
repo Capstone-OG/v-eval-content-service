@@ -98,6 +98,16 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var dbContext = services.GetRequiredService<ContentDbContext>();
+        try
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE v_eval_content.\"Materials\" ADD COLUMN IF NOT EXISTS duration_seconds INT DEFAULT 0;");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Notice checking Materials duration_seconds column.");
+        }
+
         await DiagnosticExamSeeder.SeedDiagnosticExamAsync(dbContext, logger);
         await SkillPrerequisiteSeeder.SeedSkillsAndPrerequisitesAsync(dbContext, logger);
     }

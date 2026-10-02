@@ -1,4 +1,45 @@
-# NHẬT KÝ KIỂM TRẢ TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
+# NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
+
+## [01/10/2026] - Nâng Cấp Core Flow 2 (Bước 2): Bổ Sung DomainCode Vào gRPC Protocol Buffer & RPC GetSkillsTree
+- **Cập Nhật Hợp Đồng gRPC ([`content.proto`](../V-Eval-Content_Service.API/Protos/content.proto))**:
+  - Mở rộng message `SkillNode` bổ sung trường dữ liệu `string domain_code = 8;`.
+- **Cập Nhật Xử Lý gRPC Server ([`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
+  - Trong RPC `GetSkillsTree`: Ánh xạ tự động mã miền chuẩn (`DOM_LANG`, `DOM_MATH`, `DOM_NAT_SCI`, `DOM_SOC_SCI`) theo `DomainId` và tên miền của từng kỹ năng trong đồ thị DAG.
+  - Cung cấp dữ liệu mã miền đồng bộ trực tiếp cho Practice Service phục vụ phân cụm K-Means và phân nhóm chặng học lộ trình (Stages).
+- **Kiểm Thử Biên Dịch**:
+  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error**).
+
+## [30/09/2026] - Triển Khai Hoàn Thiện APIs 20, 21: Quản Trị Bài Giảng Video Lý Thuyết & Phân Công Nhiệm Vụ APIs 16-19 Cho ThinhTT
+- **API 20: Tạo Mới Bài Giảng Video Lý Thuyết Chuẩn Theo Kỹ Năng (`POST /api/v1/content/materials`)**:
+  - Khởi tạo DTOs [`MaterialDtos.cs`](../V-Eval-Content_Service.Application/Materials/DTOs/MaterialDtos.cs): `CreateMaterialRequestDto`, `MaterialDetailDto`, `MaterialItemDto`.
+  - Xây dựng FluentValidation `CreateMaterialCommandValidator` kiểm tra ràng buộc `SkillId`, `Title` (tối đa 255 ký tự), `Content` bắt buộc, `DurationSeconds >= 0`, kiểm tra định dạng URL hợp lệ cho `VideoUrl` và `FileUrl`.
+  - Bổ sung trường `DurationSeconds` vào thực thể [`Material.cs`](../V-Eval-Content_Service.Domain/Entities/Material.cs) và ánh xạ cột `duration_seconds` trong `ContentDbContext.cs`.
+  - Triển khai `CreateMaterialCommand` và [`CreateMaterialCommandHandler.cs`](../V-Eval-Content_Service.Application/Materials/Commands/CreateMaterial/CreateMaterialCommandHandler.cs):
+    1. Kiểm tra tồn tại kỹ năng `SkillId` trong đồ thị DAG (`404 Not Found` `SkillNotFound`).
+    2. Khởi tạo bản ghi `Material` gắn với kỹ năng và miền năng lực tương ứng.
+    3. Trả về `201 Created` kèm Location header trỏ đến endpoint chi tiết.
+- **API 21: Tra Cứu Bài Giảng Video Lý Thuyết Theo Mã Kỹ Năng (`GET /api/v1/content/materials/by-skill/{skillId}`)**:
+  - Khởi tạo `GetMaterialsBySkillQuery`, `GetMaterialsBySkillQueryValidator` và [`GetMaterialsBySkillQueryHandler.cs`](../V-Eval-Content_Service.Application/Materials/Queries/GetMaterialsBySkill/GetMaterialsBySkillQueryHandler.cs).
+  - Nghiệp vụ: Xác thực `skillId` tồn tại (`404 Not Found`), truy xuất toàn bộ danh sách bài giảng lý thuyết chuẩn, link video và tài liệu đính kèm để phục vụ học sinh xem bài giảng trước khi mở khóa Quiz chặng học trong Practice Service.
+  - Bổ sung endpoint tra cứu chi tiết bài giảng theo ID: `GET /api/v1/content/materials/{id}`.
+- **Chuẩn Hóa Đồng Bộ Route API (`api/content/...`) Khớp Với API Gateway**:
+  - Gỡ bỏ hoàn toàn tiền tố `v1` khỏi các Controller trong Content Service ([`DiagnosticController.cs`](../V-Eval-Content_Service.API/Controllers/DiagnosticController.cs), [`MockExamsController.cs`](../V-Eval-Content_Service.API/Controllers/MockExamsController.cs), [`MaterialsController.cs`](../V-Eval-Content_Service.API/Controllers/MaterialsController.cs)).
+  - Đồng bộ 100% với cấu hình định tuyến của YARP API Gateway (`/api/content/{**catch-all}`) và giải quyết dứt điểm hiện tượng trùng lặp card API trên Swagger UI.
+- **Tầng API Controller ([`MaterialsController.cs`](../V-Eval-Content_Service.API/Controllers/MaterialsController.cs))**:
+  - Bổ sung 3 endpoint: `[HttpPost]`, `[HttpGet("by-skill/{skillId:guid}")]`, `[HttpGet("{id:guid}")]`.
+- **Giao Việc Phụ Trách Kỹ Thuật (Assignee: ThinhTT)**:
+  - **API 16: Thêm Mới Câu Hỏi Trắc Nghiệm Gốc (`POST /api/v1/content/questions`)**: Tiếp nhận câu hỏi LaTeX, 4 đáp án, Bloom 1-6. *Người phụ trách: ThinhTT*.
+  - **API 17: Hiệu Đính Nội Dung Câu Hỏi (`PUT /api/v1/content/questions/{questionId}`)**: Sửa nội dung, đáp án, giải thích trong ngân hàng đề. *Người phụ trách: ThinhTT*.
+  - **API 18: Xóa Hoặc Vô Hiệu Hóa Câu Hỏi (`DELETE /api/v1/content/questions/{questionId}`)**: Xóa mềm hoặc vô hiệu hóa câu hỏi sai sót. *Người phụ trách: ThinhTT*.
+  - **API 19: Đóng Gói Bộ Đề Quiz Củng Cố Chuyên Đề (`POST /api/v1/content/exams/quiz`)**: Đóng gói đề Quiz 5-10 câu gắn với SkillId. *Người phụ trách: ThinhTT*.
+- **Kiểm Thử Vận Hành Trực Tiếp (Live End-to-End Test)**:
+  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error**).
+  - Kịch bản API 20: Tạo bài giảng chuyên đề Đại số & Cực trị cho Skill `a0000001-0000-0000-0000-000000000005` -> `201 Created` trả về ID `21d4b371...`, `durationSeconds: 1800`.
+  - Kịch bản API 20 (Unhappy Case): Thử với `skillId` không tồn tại -> `404 Not Found` (`SkillNotFound`). Thử với `videoUrl` sai format -> `400 Bad Request`.
+  - Kịch bản API 21: Tra cứu bài giảng theo kỹ năng `a0000001...` -> `200 OK`, trả về danh sách 1 bài giảng đầy đủ link video, thời lượng chuẩn và tóm tắt công thức.
+  - Kịch bản API chi tiết: Tra cứu `GET /materials/21d4b371...` -> `200 OK` đầy đủ thông tin kỹ năng và miền năng lực liên kết.
+
+---
 
 ## [29/09/2026] - Bổ Sung Trọng Số Đề Thi (Weight) Và Thông Tin Miền Năng Lực (DomainId, DomainName) Vào gRPC Message SkillNode & RPC GetSkillsTree
 - **Mở Rộng Protocol Buffer & RPC GetSkillsTree**:

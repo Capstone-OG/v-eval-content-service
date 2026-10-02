@@ -33,20 +33,29 @@
 | 2 | **Import Đề Thi từ AI Engine** | `Features/Exams/Commands/Import/` | 🟢 Hoàn thành | 100% | API `POST /api/content/exams/import` khép kín 2 chiều |
 | 3 | **Bảo Toàn LaTeX & Bảng HTML** | `Features/Exams/Commands/Import/` | 🟢 Hoàn thành | 100% | Bảo toàn `\frac`, `\Delta`, bảng 2 tầng `colspan`/`rowspan` |
 | 4 | **Lưu Trữ Ảnh Minh Họa Câu Hỏi** | `Domain/Entities/` | 🟢 Hoàn thành | 100% | Chèn Markdown Image `![Hình minh họa](url)` chuẩn xác |
-| 5 | **API Lấy Danh Sách Đề Thi** | `API/Controllers/MockExamsController.cs` | 🟢 Hoàn thành | 100% | API `GET /api/v1/content/exams` |
-| 6 | **API Lấy Chi Tiết Đề Thi** | `API/Controllers/MockExamsController.cs` | 🟢 Hoàn thành | 100% | API `GET /api/v1/content/exams/{id}` |
-| 7 | **API Xóa Đề Thi Cascade** | `API/Controllers/MockExamsController.cs` | 🟢 Hoàn thành | 100% | API `DELETE /api/v1/content/exams/{id}` |
+| 5 | **API Lấy Danh Sách Đề Thi** | `API/Controllers/MockExamsController.cs` | 🟢 Hoàn thành | 100% | API `GET /api/content/exams` |
+| 6 | **API Lấy Chi Tiết Đề Thi** | `API/Controllers/MockExamsController.cs` | 🟢 Hoàn thành | 100% | API `GET /api/content/exams/{id}` |
+| 7 | **API Xóa Đề Thi Cascade** | `API/Controllers/MockExamsController.cs` | 🟢 Hoàn thành | 100% | API `DELETE /api/content/exams/{id}` |
 | 8 | **Dockerfile & Compose** | `Dockerfile` | 🟢 Hoàn thành | 100% | Cổng 5249 kết nối mạng nội bộ `veval_network` |
 | 9 | **Script Push Độc Lập** | `Scripts/push.bat` | 🟢 Hoàn thành | 100% | Hỗ trợ 3 chế độ push kèm kiểm tra lịch sử |
 | 10 | **Result Pattern & Error Handling** | `Application/Common/Models/` & `API/Controllers/Base/` | 🟢 Hoàn thành | 100% | Triển khai `Result<T>`, `ErrorType`, `ApiControllerBase` |
 | 11 | **Validation Pipeline Behavior** | `Application/Common/Behaviors/` | 🟢 Hoàn thành | 100% | `ValidationBehavior` tích hợp FluentValidation |
-| 12 | **Đề Thi Chẩn Đoán (30 câu V-ACT)** | `Application/Diagnostic/` & `API/Controllers/DiagnosticController.cs` | 🟢 Hoàn thành | 100% | `GET /api/v1/content/diagnostic-test` (Anti-cheat 100%, hỗ trợ `excludeExamId` Unhappy Case 2) |
+| 12 | **Đề Thi Chẩn Đoán (30 câu V-ACT)** | `Application/Diagnostic/` & `API/Controllers/DiagnosticController.cs` | 🟢 Hoàn thành | 100% | `GET /api/content/diagnostic-test` (Anti-cheat 100%, hỗ trợ `excludeExamId` Unhappy Case 2) |
 | 13 | **Seeding Đề Chẩn Đoán Mẫu** | `Infrastructure/Persistence/Seeds/DiagnosticExamSeeder.cs` | 🟢 Hoàn thành | 100% | Tự động tạo đề 30 câu khi app khởi động |
 | 14 | **Swagger UI Trực Quan** | `API/Program.cs` | 🟢 Hoàn thành | 100% | Giao diện Swagger phân nhóm tại `:5249/swagger` |
 | 15 | **gRPC Server (Chấm Điểm)** | `API/Services/ContentGrpcService.cs` | 🟢 Hoàn thành | 100% | RPC `GetExamAnswerKey` phục vụ Practice Service |
 | 16 | **SkillPrerequisites & DAG Seeding** | `Domain/Entities/SkillPrerequisite.cs` & `Infrastructure/Persistence/Seeds/SkillPrerequisiteSeeder.cs` | 🟢 Hoàn thành | 100% | Entity bảng nối, cấu hình Fluent API, seed 12 kỹ năng chuẩn và 9 cung DAG |
 | 17 | **gRPC RPC GetSkillsTree** | `API/Services/ContentGrpcService.cs` | 🟢 Hoàn thành | 100% | RPC `GetSkillsTree` cung cấp cấu trúc Cây khung năng lực cho Practice Service |
-| 18 | **Ngân Hàng Câu Hỏi Tự Sinh AI**| `API/Controllers/MockExamsController.cs` | 🟢 Hoàn thành | 100% | Nhận đề sinh từ AI Engine qua `POST /api/v1/content/exams/import` |
-| 19 | **Phê Duyệt & Xuất Bản Đề Thi** | `Application/MockExams/Commands/PublishMockExam/` | 🟢 Hoàn thành | 100% | `PublishMockExamCommand`, route `PATCH /api/v1/content/exams/{id}/publish` |
+| 18 | **Ngân Hàng Câu Hỏi Tự Sinh AI**| `API/Controllers/MockExamsController.cs` | 🟢 Hoàn thành | 100% | Nhận đề sinh từ AI Engine qua `POST /api/content/exams/import` |
+| 19 | **Phê Duyệt & Xuất Bản Đề Thi** | `Application/MockExams/Commands/PublishMockExam/` | 🟢 Hoàn thành | 100% | `PublishMockExamCommand`, route `PATCH /api/content/exams/{id}/publish` |
 | 20 | **Chuẩn Hóa Bloom 6 Cấp Độ** | `Domain/Constants/BloomTaxonomy.cs` | 🟢 Hoàn thành | 100% | Revised Bloom's Taxonomy 6 cấp độ định lượng độ khó câu hỏi |
 | 21 | **Chuẩn Hóa Múi Giờ Việt Nam** | `API/Controllers/MockExamsController.cs` & DTOs | 🟢 Hoàn thành | 100% | Role timezone `Asia/Ho_Chi_Minh`, trường `createdAtVn` format chuẩn |
+| 22 | **Core Flow 2 - API 16: Thêm Câu Hỏi Ngân Hàng Gốc** | `Features/Questions/Commands/CreateQuestion/` | 🟡 Chưa thực hiện | 0% | **Phụ trách: ThinhTT**. `POST /api/content/questions` thêm câu hỏi trắc nghiệm (LaTeX, Bloom 1-6, SkillId) |
+| 23 | **Core Flow 2 - API 17: Hiệu Đính Nội Dung Câu Hỏi** | `Features/Questions/Commands/UpdateQuestion/` | 🟡 Chưa thực hiện | 0% | **Phụ trách: ThinhTT**. `PUT /api/content/questions/{id}` sửa nội dung, đáp án, lời giải |
+| 24 | **Core Flow 2 - API 18: Xóa / Vô Hiệu Hóa Câu Hỏi** | `Features/Questions/Commands/DeleteQuestion/` | 🟡 Chưa thực hiện | 0% | **Phụ trách: ThinhTT**. `DELETE /api/content/questions/{id}` xóa/vô hiệu hóa câu hỏi sai sót |
+| 25 | **Core Flow 2 - API 19: Đóng Gói Bộ Đề Quiz Củng Cố**| `Features/Exams/Commands/CreateQuizExam/` | 🟡 Chưa thực hiện | 0% | **Phụ trách: ThinhTT**. `POST /api/content/exams/quiz` đóng gói đề Quiz 5-10 câu gắn với SkillId |
+| 26 | **Core Flow 2 - API 20: Tạo Bài Giảng Video Lý Thuyết** | `MaterialsController.cs` & `CreateMaterialCommandHandler.cs` | 🟢 Hoàn thành | 100% | `POST /api/content/materials` tạo và liên kết bài giảng video lý thuyết chuẩn (`Title`, `VideoUrl`, `DurationSeconds`) |
+| 27 | **Core Flow 2 - API 21: Tra Cứu Video Bài Giảng Kỹ Năng**| `MaterialsController.cs` & `GetMaterialsBySkillQueryHandler.cs` | 🟢 Hoàn thành | 100% | `GET /api/content/materials/by-skill/{skillId}` tra cứu video bài giảng lý thuyết theo kỹ năng chặng học |
+| 28 | **Core Flow 2 (Thematic Cohort - Bước 2): Bổ Sung DomainCode Vào gRPC GetSkillsTree** | `Protos/content.proto` & `API/Services/ContentGrpcService.cs` | 🟢 Hoàn thành | 100% | Mở rộng message `SkillNode` bổ sung `domain_code`, ánh xạ mã miền chuẩn cho 12 kỹ năng DAG |
+
+
