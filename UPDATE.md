@@ -1,11 +1,11 @@
 # Nhật Ký Cập Nhật (Update Log) - Content Service
 
-## [01/10/2026] - Nâng Cấp Core Flow 2 (Bước 2): Bổ Sung DomainCode Vào gRPC Protocol Buffer & RPC GetSkillsTree
+## [07/10/2026] - Chuẩn Hóa Khung Cấu Hình gRPC Kestrel & Kết Nối CSDL Tập Trung
 
-- **Hợp Đồng gRPC Protocol Buffer ([`content.proto`](./V-Eval-Content_Service.API/Protos/content.proto))**:
-  - Bổ sung trường `string domain_code = 8;` vào message `SkillNode`.
-- **Hiện Thực gRPC Server ([`ContentGrpcService.cs`](./V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
-  - Ánh xạ mã miền năng lực chuẩn (`DOM_LANG`, `DOM_MATH`, `DOM_NAT_SCI`, `DOM_SOC_SCI`) trực tiếp từ `DomainId` và tên miền của từng kỹ năng thuộc đồ thị DAG.
-  - Cung cấp dữ liệu chuẩn mực để Practice Service phân cụm K-Means và phân nhóm chặng học lộ trình (Stages).
-- **Kiểm Thử Toàn Diện & Biên Dịch Solution**:
-  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error**).
+- **Chuẩn Hóa File Cấu Hình Mẫu (`appsettings.example.json`)**:
+  - Bổ sung cấu hình `Kestrel` hỗ trợ giao thức Http1AndHttp2 cho gRPC Server port `:5250`.
+  - Loại bỏ các thiết lập dư thừa không sử dụng, đồng bộ chính xác với `appsettings.json`.
+- **Hỗ Trợ Cơ Chế Đồng Bộ Tự Động**:
+  - Đồng bộ cùng thư mục `Configs/V-Eval-Content_Service/` của System-Repo thông qua `sync_config.bat`.
+- **Kiểm Thử Biên Dịch**:
+  - `dotnet build` đạt 100% thành công (0 warning, 0 error).
