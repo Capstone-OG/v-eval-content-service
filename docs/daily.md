@@ -1,5 +1,22 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [12/10/2026] - Nghiệm Thu Kiến Trúc Ngân Hàng Câu Hỏi & Đóng Gói Đề Quiz Thích Ứng (APIs 16 - 19)
+
+- **Nghiệm Thu Kiến Trúc Liên Thông Micro-Grouping (Practice Service <-> Content Service)**:
+  - Thấu hiểu cơ chế tiếp nhận danh sách `CommonWeakSkillIds` từ thuật toán phân cụm vi mô `ClassMicroClusterer` bên Practice Service.
+  - Phân tích ranh giới dữ liệu: `Practice Service` quản lý trạm bàn học và lớp học offline trần 20 học sinh, `Content Service` là Single Source of Truth cho toàn bộ câu hỏi, công thức LaTeX, cấp độ Bloom 1-6 và lời giải chi tiết.
+- **Đặc Tả Kỹ Thuật Chi Tiết Bộ 4 REST APIs Core Flow 2 (Assignee: ThinhTT)**:
+  - **API 16: `POST /api/content/questions`**: Thêm câu hỏi vào ngân hàng đề gốc với nội dung LaTeX bảo toàn, 4 đáp án (1 đáp án đúng), độ khó IRT `[-3.0, +3.0]`, cấp độ Bloom và lời giải chi tiết.
+  - **API 17: `PUT /api/content/questions/{id}`**: Hiệu đính nội dung, đáp án, độ khó, cấp độ nhận thức Bloom và giải thích.
+  - **API 18: `DELETE /api/content/questions/{id}`**: Xóa mềm / vô hiệu hóa câu hỏi sai sót trong ngân hàng đề.
+  - **API 19: `POST /api/content/exams/quiz`**: Đóng gói đề Quiz củng cố 5-10 câu hỏi chuẩn Bloom từ `CommonWeakSkillIds`, tạo bản ghi `MockExam` tự động trả về `worksheetId` và `worksheetTitle` cho Practice Service gán bài tập.
+- **Khởi Tạo Nhánh Tính Năng Mới**:
+  - Khởi tạo nhánh `ThinhTT/feature-content-questions-quiz-apis` từ `develop` để tiến hành lập trình khép kín bộ 4 APIs.
+- **Trạng Thái Kiểm Thử**:
+  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error**).
+
+---
+
 ## [07/10/2026] - Chuẩn Hóa Khung Cấu Hình gRPC Kestrel & Kết Nối CSDL Tập Trung
 - **Chuẩn Hóa File Cấu Hình Mẫu (`appsettings.example.json`)**:
   - Bổ sung cấu hình `Kestrel` hỗ trợ giao thức Http1AndHttp2 cho gRPC Server port `:5250`.
