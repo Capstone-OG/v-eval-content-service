@@ -32,7 +32,7 @@
   - **API 18: `DELETE /api/content/questions/{id}`**: Xóa mềm / vô hiệu hóa câu hỏi sai sót trong ngân hàng đề.
   - **API 19: `POST /api/content/exams/quiz`**: Đóng gói đề Quiz củng cố 5-10 câu hỏi chuẩn Bloom từ `CommonWeakSkillIds`, tạo bản ghi `MockExam` tự động trả về `worksheetId` và `worksheetTitle` cho Practice Service gán bài tập.
 - **Khởi Tạo Nhánh Tính Năng Mới**:
-  - Khởi tạo nhánh `ThinhTT/feature-content-questions-quiz-apis` từ `develop` để tiến hành lập trình khép kín bộ 4 APIs.
+  - Khởi tạo nhánh `ThinhTT/feature-question-bank-adaptive-quiz` từ `develop` để tiến hành lập trình khép kín bộ 4 APIs.
 - **Trạng Thái Kiểm Thử**:
   - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error**).
 
