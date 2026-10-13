@@ -1,16 +1,15 @@
 # Nhật Ký Cập Nhật (Update Log) - Content Service
 
-## [12/10/2026] - Nghiệm Thu Kiến Trúc Ngân Hàng Câu Hỏi & Đóng Gói Đề Quiz Thích Ứng (APIs 16 - 19)
+## [13/10/2026] - Triển Khai Hoàn Thiện Ngân Hàng Câu Hỏi Gốc (APIs 16 - 18) & Đóng Gói Bộ Đề Quiz Thích Ứng (API 19)
 
-- **Nghiệm Thu Kiến Trúc Liên Thông Phân Nhóm Vi Mô (Practice Service <-> Content Service)**:
-  - Thấu hiểu cơ chế tiếp nhận `CommonWeakSkillIds` từ thuật toán phân cụm vi mô `ClassMicroClusterer` để đóng gói đề tự động.
-  - Khẳng định Content Service là Single Source of Truth cho toàn bộ câu hỏi, công thức LaTeX, phân loại Bloom 6 cấp độ và giải thích chi tiết.
-- **Đặc Tả Kỹ Thuật Chi Tiết Bộ 4 REST APIs Core Flow 2 (Assignee: ThinhTT)**:
-  - **API 16: `POST /api/content/questions`**: Thêm mới câu hỏi trắc nghiệm gốc với nội dung LaTeX bảo toàn, 4 lựa chọn, độ khó IRT `[-3.0, +3.0]`, cấp độ Bloom và lời giải chi tiết.
-  - **API 17: `PUT /api/content/questions/{id}`**: Hiệu đính nội dung, đáp án, độ khó, cấp độ nhận thức Bloom và giải thích.
-  - **API 18: `DELETE /api/content/questions/{id}`**: Xóa mềm / vô hiệu hóa câu hỏi sai sót trong ngân hàng đề.
-  - **API 19: `POST /api/content/exams/quiz`**: Đóng gói đề Quiz củng cố 5-10 câu chuẩn Bloom từ `CommonWeakSkillIds`, tự động sinh đề `MockExam` trả về `worksheetId` và `worksheetTitle` cho Practice Service.
-- **Khởi Tạo Nhánh Tính Năng Mới**:
-  - Khởi tạo nhánh `ThinhTT/feature-content-questions-quiz-apis` từ `develop` để triển khai mã nguồn bộ 4 APIs.
-- **Kiểm Thử Biên Dịch**:
-  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error**).
+- **Triển Khai Bộ 3 REST APIs Quản Trị Ngân Hàng Câu Hỏi Gốc (`QuestionsController.cs`)**:
+  - **API 16: `POST /api/content/questions`**: Thêm mới câu hỏi trắc nghiệm gốc với nội dung LaTeX bảo toàn, 4 lựa chọn A-D, phương án đúng `CorrectOption`, độ khó Bloom 1-6 và lời giải chi tiết `Explanation`.
+  - **API 17: `PUT /api/content/questions/{id}`**: Hiệu đính nội dung, đáp án, độ khó, cấp độ nhận thức Bloom, giải thích và liên kết bài đọc hiểu.
+  - **API 18: `DELETE /api/content/questions/{id}`**: Xóa câu hỏi khỏi ngân hàng đề và tự động giải phóng các liên kết trong `exam_questions`.
+  - **APIs Tra Cứu**: `GET /api/content/questions/{id}` và `GET /api/content/questions/by-skill/{skillId}` (hỗ trợ lọc theo cấp độ Bloom).
+- **Triển Khai API 19: Đóng Gói Bộ Đề Quiz Thích Ứng (`POST /api/content/exams/quiz`)**:
+  - Nhận danh sách `SkillIds` / `CommonWeakSkillIds` (từ thuật toán phân cụm vi mô Practice Service).
+  - Thuật toán bốc ngẫu nhiên câu hỏi theo dải độ khó Bloom (mặc định Bloom 1-3), tự động đóng gói thành đề `MockExam` loại `QUIZ`.
+  - Trả về `ExamId` (dùng làm `WorksheetId`), `Title` (dùng làm `WorksheetTitle`) và danh sách câu hỏi LaTeX.
+- **Biên Dịch & Kiểm Thử**:
+  - Toàn bộ solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error**).

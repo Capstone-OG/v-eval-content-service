@@ -1,5 +1,26 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [13/10/2026] - Triển Khai Hoàn Thiện Ngân Hàng Câu Hỏi Gốc (APIs 16 - 18) & Bộ Đề Quiz Thích Ứng (API 19)
+
+- **Triển Khai Bộ 3 REST APIs Quản Trị Ngân Hàng Câu Hỏi Gốc (`QuestionsController.cs`)**:
+  - **API 16 (`POST /api/content/questions`)**: Triển khai `CreateQuestionCommand`, Validator và Handler. Tiếp nhận công thức LaTeX stem (`ContentLatex`), 4 đáp án A-D, phương án đúng `CorrectOption`, phân loại Bloom 6 cấp độ (`DifficultyLevel` 1-6) và lời giải chi tiết `Explanation`. Trả về `201 Created` kèm Location header.
+  - **API 17 (`PUT /api/content/questions/{id}`)**: Triển khai `UpdateQuestionCommand`, Validator và Handler. Hiệu đính nội dung, đáp án, cấp độ Bloom, giải thích và liên kết bài đọc hiểu `PassageId`.
+  - **API 18 (`DELETE /api/content/questions/{id}`)**: Triển khai `DeleteQuestionCommand` và Handler. Xóa an toàn câu hỏi và tự động dọn dẹp các liên kết trong `exam_questions`.
+  - **API Tra Cứu Câu Hỏi**:
+    - `GET /api/content/questions/{id}`: Tra cứu chi tiết một câu hỏi kèm thông tin Kỹ năng và Miền năng lực liên kết.
+    - `GET /api/content/questions/by-skill/{skillId}`: Tra cứu danh sách câu hỏi theo kỹ năng chuẩn và lọc theo cấp độ nhận thức Bloom (`bloomLevel`).
+- **Triển Khai API 19: Đóng Gói Bộ Đề Quiz Thích Ứng (`POST /api/content/exams/quiz`)**:
+  - Triển khai `CreateQuizExamCommand`, Validator và Handler trong `MockExamsController.cs`.
+  - Thuật toán trích xuất thích ứng:
+    - Tiếp nhận danh sách `SkillIds` (hoặc `CommonWeakSkillIds` từ phân nhóm vi mô Practice Service).
+    - Lọc câu hỏi trong ngân hàng đề theo dải độ khó Bloom (mặc định Bloom 1-3: Nhận biết, Thông hiểu, Vận dụng).
+    - Tự động xáo trộn và bốc đủ số lượng `QuestionCount` (5-10 câu), tạo bản ghi `MockExam` loại `QUIZ`, gắn thứ tự `QuestionOrder` trong `ExamQuestions`.
+    - Trả về `QuizExamResponseDto` với `ExamId` (dùng làm `WorksheetId`), `Title` (dùng làm `WorksheetTitle`) và danh sách câu hỏi.
+- **Biên Dịch & Kiểm Thử**:
+  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error**).
+
+---
+
 ## [12/10/2026] - Nghiệm Thu Kiến Trúc Ngân Hàng Câu Hỏi & Đóng Gói Đề Quiz Thích Ứng (APIs 16 - 19)
 
 - **Nghiệm Thu Kiến Trúc Liên Thông Micro-Grouping (Practice Service <-> Content Service)**:
