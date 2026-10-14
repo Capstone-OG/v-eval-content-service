@@ -1,11 +1,19 @@
 # Nhật Ký Cập Nhật (Update Log) - Content Service
 
-## [14/10/2026] - Triển Khai REST API Dàn Kiến Thức & Khung Tri Thức Động (Curriculum & Knowledge Tree API)
+## [15/10/2026] - Triển Khai Kiến Trúc Nạp Tri Thức Động Kép (Giảng Viên & AI Ingestion), Bộ API Hiệu Đính Sư Phạm & Xóa Bỏ 100% Hardcode
 
-- **Triển Khai REST API Dàn Kiến Thức (`GET /api/content/curriculum`)**:
-  - Xây dựng `CurriculumController.cs` tiếp nhận truy vấn dàn kiến thức chuẩn ĐHQG-HCM từ Web Client qua Gateway.
-  - Xây dựng `GetCurriculumTreeQuery.cs` và `GetCurriculumTreeQueryHandler.cs` trong tầng Application: Truy vấn trực tiếp từ cơ sở dữ liệu `CompetencyDomains`, `Skills`, `Materials`, `Questions` và `SkillPrerequisites`.
-  - Loại bỏ hoàn toàn việc hardcode danh mục trên Frontend: Cung cấp đầy đủ cấu trúc 4 miền, 12 kỹ năng chuẩn, trọng số, chuẩn Bloom, công thức KaTeX và mô hình liên môn GraphRAG.
+- **Xóa Bỏ Toàn Bộ Hardcode C# & Dữ Liệu Tĩnh Trong Mã Nguồn**:
+  - Loại bỏ hoàn toàn `CurriculumHierarchySeeder.cs` và các switch-case hardcode LaTeX/câu hỏi giả trong `GetCurriculumTreeQuery.cs`.
+  - Toàn bộ dữ liệu được truy vấn 100% động từ cơ sở dữ liệu PostgreSQL (`v_eval_content`), sử dụng quan hệ điều hướng EF Core và biểu thức chính quy (Regex) trích xuất công thức KaTeX từ văn bản thực tế.
+- **Triển Khai REST API Nhập Liệu Tri Thức Động (`POST /api/content/curriculum/import`)**:
+  - Hỗ trợ kiến trúc 2 kênh bổ trợ lẫn nhau: Giảng viên/Ban Chuyên Môn chủ động quản lý nhập liệu và AI Engine tự động nạp phân tích từ file PDF Sách Giáo Khoa.
+  - Triển khai `ImportCurriculumCommand` và `ImportCurriculumCommandHandler`: Tự động upsert toàn bộ cây phân cấp đa môn: `Miền Năng Lực` -> `Chương` -> `Bài học` -> `Dạng bài` -> `Materials` -> `Questions` -> `SkillPrerequisites`.
+- **Triển Khai Trọn Bộ REST APIs Hiệu Đính Tri Thức Sư Phạm Dành Riêng Cho Giảng Viên**:
+  - **`PUT /api/content/curriculum/patterns/{id}` (`UpdatePatternCommand`)**: Cho phép giảng viên toàn quyền hiệu đính 4 khối nội dung dạng bài: Tên dạng, trọng số, Khối 1 (Nền tảng SGK), Khối 2 (Phương pháp giải KaTeX từng bước), Khối 3 (Video URL & thời lượng), Khối 4 (Câu hỏi mẫu minh họa, đáp án đúng & lời giải chi tiết).
+  - **`PUT /api/content/curriculum/nodes/{id}` (`UpdateNodeCommand`)**: Cập nhật tên, mô tả hoặc thứ bậc của Chương / Bài học.
+  - **`POST /api/content/curriculum/nodes` (`CreateNodeCommand`)**: Cho phép giảng viên thêm mới Chương, Bài học hoặc Dạng bài vào Cây tri thức.
+  - **`DELETE /api/content/curriculum/nodes/{id}` (`DeleteNodeCommand`)**: Xóa node an toàn và tự động dọn dẹp quan hệ tiên quyết DAG, tài liệu và câu hỏi liên quan.
+- **Cấu Trúc Cây 3 Tầng Chuẩn Sư Phạm SGK Cho Mọi Môn Học**:
+  - Trả về cấu trúc cây 3 tầng động chuẩn mực (`Chapters` -> `Lessons` -> `Patterns`) qua API `GET /api/content/curriculum`.
 - **Biên Dịch & Kiểm Thử Vận Hành**:
-  - `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error** trên .NET 9).
-  - Kiểm thử trực tiếp qua Gateway `GET http://localhost:5212/api/content/curriculum` trả về 200 OK với đầy đủ 4 miền năng lực và 12 kỹ năng.
+  - `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error** trên .NET 9 SDK).

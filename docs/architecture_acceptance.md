@@ -116,3 +116,33 @@ To avoid architectural ambiguity, the system establishes a clear dual ingestion 
 - **Architectural Rationale**: Exposes the complete 4-domain competency taxonomy and 12 standard V-ACT competencies directly from Content Service database to the Web Client through YARP Gateway, completely eliminating any hardcoded curriculum structures on the frontend.
 - **Data Encapsulation**: Delivers domain metadata, competency weights, Bloom cognitive levels, KaTeX formulas, Cross-Disciplinary GraphRAG models, prerequisite relationships, sample questions, and video lecture references dynamically.
 
+---
+
+## 7. 3-LEVEL CURRICULUM HIERARCHY & 4 PEDAGOGICAL LAYERS ACCEPTANCE
+- **Architectural Motivation**: Grounding the digital learning roadmap in realistic K12 curriculum standards (Ministry of Education GDPT 2018) by moving beyond flat skill lists to a hierarchical structure: `Domain` -> `Chapter` -> `Lesson` -> `Pattern`.
+- **Database Self-Referencing Topology**:
+  - Leverages `Skills.ParentId` self-referencing foreign key to represent arbitrarily deep nesting:
+    - Level 1: Chapters (`ParentId = null`, e.g., Chapter 1: Derivative Applications).
+    - Level 2: Lessons (`ParentId = Chapter.SkillId`, e.g., Lesson 1: Monotonicity).
+    - Level 3: Patterns (`ParentId = Lesson.SkillId`, e.g., Pattern 1.1: Basic Monotonicity, Pattern 1.2: Parameterized Monotonicity).
+- **Four Pedagogical Layers per Pattern**:
+  - *Layer 1 (Foundational Knowledge & Prerequisites)*: Extracted from `Materials.Content` storing standard textbook definitions, theorems, and linking Directed Acyclic Graph (DAG) dependencies (`SkillPrerequisites`).
+  - *Layer 2 (Step-by-step Solution Methodology & KaTeX Formulas)*: Preserves algorithmic derivation steps (Step 1 -> Step 2 -> Step 3) and key mathematical formulas.
+  - *Layer 3 (Video Lecture & Step-by-step Sample Solution)*: Integrates lecture metadata (`VideoUrl`, `DurationSeconds`) and calibrated bank questions with step-by-step explanations.
+  - *Layer 4 (Adaptive Quiz with Automatic Adjacent Weak Skill Bundling)*: Automatically inspects the student's mastery profile. When launching a quiz on a target pattern, any adjacent prerequisite node with mastery `` `P(L_t) <= 10%` `` is bundled into the API 19 request payload to eliminate knowledge deficiencies at their root.
+
+---
+
+## 8. DUAL-CHANNEL DYNAMIC INGESTION & INSTRUCTOR CURATION SUITE ACCEPTANCE
+- **Anti-Hardcoding Paradigm**: Completely purged static C# seeders and switch-cases. The knowledge ontology is 100% dynamically stored and retrieved from PostgreSQL.
+- **Dual-Channel Ingestion Pipeline**:
+  - *Channel 1 (AI Engine OCR)*: Parses PDF textbooks into structured JSON trees and ingests via `POST /api/content/curriculum/import`.
+  - *Channel 2 (Academic & Instructor Authorship)*: Academic managers manually register or curate curriculum trees directly.
+- **Full-Fledged Instructor Curation REST Suite**:
+  - `PUT /api/content/curriculum/patterns/{id}`: Granular atomic updates across all 4 pedagogical layers (Name, Weight, TheoryRecap, SolutionMethod, VideoUrl, Sample Question).
+  - `PUT /api/content/curriculum/nodes/{id}`: Updates Chapter/Lesson titles, weights, and descriptions.
+  - `POST /api/content/curriculum/nodes`: Dynamically adds new Chapters, Lessons, or Patterns without server restarts.
+  - `DELETE /api/content/curriculum/nodes/{id}`: Safely cascades node deletion with clean prerequisite DAG cleanup.
+- **Live Pedagogical Feedback**: Web client integrates instant KaTeX math rendering previews, video embed previews, and AI method templating to maximize instructor productivity.
+
+

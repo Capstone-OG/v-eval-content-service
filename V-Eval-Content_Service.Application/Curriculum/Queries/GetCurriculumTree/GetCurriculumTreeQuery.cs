@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
@@ -27,7 +28,7 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
         GetCurriculumTreeQuery request,
         CancellationToken cancellationToken)
     {
-        // 1. Lấy danh sách CompetencyDomains kèm Skills, Prerequisites, Materials, Questions từ Database
+        // Truy vấn 100% từ Database: CompetencyDomains kèm Skills, Materials, Questions, Prerequisites
         var domains = await _context.CompetencyDomains
             .AsNoTracking()
             .Include(d => d.Skills)
@@ -43,93 +44,149 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
 
         foreach (var d in domains)
         {
-            var (domainCode, title, subtitle, icon, gradient, activeBg) = ResolveDomainMetadata(d.DomainId, d.Name);
+            var (icon, gradient, activeBg) = ResolveDomainVisuals(d.Name);
 
             var domainDto = new CurriculumDomainDto
             {
-                Id = $"domain-{domainCode.ToLowerInvariant().Replace("_", "-")}",
+                Id = $"domain-{d.DomainId}",
                 DomainId = d.DomainId.ToString(),
-                DomainCode = domainCode,
-                Title = !string.IsNullOrWhiteSpace(d.Name) ? d.Name : title,
-                Subtitle = subtitle,
+                DomainCode = ResolveDomainCode(d.DomainId, d.Name),
+                Title = d.Name,
+                Subtitle = d.Description ?? "Chuyên đề khung năng lực",
                 Icon = icon,
                 Gradient = gradient,
                 ActiveBg = activeBg,
+                Chapters = new List<CurriculumChapterDto>(),
                 Skills = new List<CurriculumSkillDto>()
             };
 
-            foreach (var s in d.Skills.OrderBy(s => s.CreatedAt).ThenBy(s => s.Name))
+            var allSkills = d.Skills.OrderBy(s => s.CreatedAt).ThenBy(s => s.Name).ToList();
+
+            // 1. Cây 3 cấp động: Chương (Skills có ParentId == null và có con hoặc tên Chương)
+            var chapters = allSkills
+                .Where(s => s.ParentId == null && (s.Name.StartsWith("Chương", StringComparison.OrdinalIgnoreCase) || allSkills.Any(c => c.ParentId == s.SkillId)))
+                .ToList();
+
+            if (chapters.Count > 0)
             {
-                var skillMetadata = ResolveSkillMetadata(s.SkillId, s.Name, domainCode);
-
-                // Sample Question: ưu tiên câu hỏi từ Database, nếu chưa có thì dùng câu hỏi chuẩn
-                var dbQuestion = s.Questions.FirstOrDefault();
-                CurriculumSampleQuestionDto sampleQ;
-                if (dbQuestion != null)
+                int chapOrder = 1;
+                foreach (var chap in chapters)
                 {
-                    sampleQ = new CurriculumSampleQuestionDto
+                    var chapterDto = new CurriculumChapterDto
                     {
-                        QuestionId = dbQuestion.QuestionId.ToString(),
-                        Content = dbQuestion.ContentLatex,
-                        Options = new List<string>
-                        {
-                            $"A. {dbQuestion.OptionA}",
-                            $"B. {dbQuestion.OptionB}",
-                            $"C. {dbQuestion.OptionC}",
-                            $"D. {dbQuestion.OptionD}"
-                        },
-                        Correct = dbQuestion.CorrectOption switch
-                        {
-                            'A' => 0,
-                            'B' => 1,
-                            'C' => 2,
-                            'D' => 3,
-                            _ => 0
-                        },
-                        Explanation = dbQuestion.Explanation ?? "Lời giải chi tiết chuẩn hóa theo phương pháp tư duy ĐHQG-HCM."
+                        ChapterId = chap.SkillId.ToString(),
+                        Name = chap.Name,
+                        Code = $"CH_{chapOrder++:D2}",
+                        Description = chap.Materials.FirstOrDefault()?.Content ?? $"Hệ thống kiến thức: {chap.Name}",
+                        Weight = chap.Weight ?? 0.25,
+                        Lessons = new List<CurriculumLessonDto>()
                     };
-                }
-                else
-                {
-                    sampleQ = skillMetadata.SampleQuestion;
-                }
 
-                // Video Lesson: ưu tiên tài liệu bài giảng từ Database
-                var dbMaterial = s.Materials.FirstOrDefault();
-                CurriculumVideoLessonDto video;
-                if (dbMaterial != null)
-                {
-                    video = new CurriculumVideoLessonDto
+                    var lessons = allSkills.Where(s => s.ParentId == chap.SkillId).ToList();
+                    int lesOrder = 1;
+                    foreach (var les in lessons)
                     {
-                        Title = dbMaterial.Title,
-                        Teacher = "Thầy Cô Ban Chuyên Môn ĐGNL",
-                        Duration = $"{Math.Max(15, dbMaterial.DurationSeconds / 60)} phút",
-                        Views = "3.5k lượt học",
-                        VideoUrl = dbMaterial.VideoUrl
-                    };
+                        var lessonDto = new CurriculumLessonDto
+                        {
+                            LessonId = les.SkillId.ToString(),
+                            Name = les.Name,
+                            Code = $"{chapterDto.Code}_L{lesOrder++:D2}",
+                            Summary = les.Materials.FirstOrDefault()?.Content ?? $"Bài học: {les.Name}",
+                            Weight = les.Weight ?? 0.08,
+                            Patterns = new List<CurriculumPatternDto>()
+                        };
+
+                        var patterns = allSkills.Where(s => s.ParentId == les.SkillId).ToList();
+                        int patOrder = 1;
+                        foreach (var pat in patterns)
+                        {
+                            lessonDto.Patterns.Add(BuildPatternFromEntity(pat, $"{lessonDto.Code}_P{patOrder++:D2}"));
+                        }
+
+                        // Nếu bài học là lá (chưa có dạng bài con), lấy chính nó làm dạng bài
+                        if (lessonDto.Patterns.Count == 0)
+                        {
+                            lessonDto.Patterns.Add(BuildPatternFromEntity(les, $"{lessonDto.Code}_P01"));
+                        }
+
+                        chapterDto.Lessons.Add(lessonDto);
+                    }
+
+                    domainDto.Chapters.Add(chapterDto);
                 }
-                else
+            }
+
+            // 2. Kỹ năng phẳng (chưa lồng cây): Gom thành chuyên đề chuẩn để đảm bảo cấu trúc đồng nhất
+            var flatSkills = allSkills.Where(s => s.ParentId == null && !chapters.Contains(s)).ToList();
+            if (flatSkills.Count > 0)
+            {
+                var defaultChap = new CurriculumChapterDto
                 {
-                    video = skillMetadata.VideoLesson;
+                    ChapterId = $"chap-general-{d.DomainId}",
+                    Name = $"Khung Năng Lực Chuẩn - {d.Name}",
+                    Code = $"{domainDto.DomainCode}_CORE",
+                    Description = d.Description ?? "Danh mục kỹ năng trọng tâm",
+                    Weight = 1.0,
+                    Lessons = new List<CurriculumLessonDto>()
+                };
+
+                int lesIdx = 1;
+                foreach (var s in flatSkills)
+                {
+                    var lessonDto = new CurriculumLessonDto
+                    {
+                        LessonId = s.SkillId.ToString(),
+                        Name = s.Name,
+                        Code = $"{defaultChap.Code}_L{lesIdx++:D2}",
+                        Summary = s.Materials.FirstOrDefault()?.Content ?? s.Name,
+                        Weight = s.Weight ?? 0.08,
+                        Patterns = new List<CurriculumPatternDto>
+                        {
+                            BuildPatternFromEntity(s, $"{defaultChap.Code}_P{lesIdx:D2}")
+                        }
+                    };
+                    defaultChap.Lessons.Add(lessonDto);
                 }
 
-                var skillDto = new CurriculumSkillDto
+                domainDto.Chapters.Add(defaultChap);
+            }
+
+            // 3. Danh sách phẳng Skills (tương thích ngược)
+            foreach (var s in allSkills)
+            {
+                var mat = s.Materials.FirstOrDefault();
+                var q = s.Questions.FirstOrDefault();
+
+                domainDto.Skills.Add(new CurriculumSkillDto
                 {
                     SkillId = s.SkillId.ToString(),
                     Name = s.Name,
-                    Code = skillMetadata.Code,
+                    Code = $"SKILL_{s.SkillId.ToString()[..4].ToUpperInvariant()}",
                     Weight = $"{Math.Round((s.Weight ?? 0.08) * 100)}%",
-                    Level = skillMetadata.Level,
-                    CrossModel = skillMetadata.CrossModel,
-                    CrossNote = skillMetadata.CrossNote,
-                    Theory = skillMetadata.Theory,
-                    KeyFormulas = skillMetadata.KeyFormulas,
+                    Level = q != null ? $"Bloom L{q.DifficultyLevel}" : "Chuẩn",
+                    CrossModel = mat?.Title ?? "",
+                    CrossNote = mat?.Content ?? "",
+                    Theory = mat?.Content ?? "Kiến thức chuẩn trong cơ sở dữ liệu.",
+                    KeyFormulas = ExtractFormulasFromContent(mat?.Content),
                     PrerequisiteIds = s.Prerequisites.Select(p => p.PrerequisiteId.ToString()).ToList(),
-                    VideoLesson = video,
-                    SampleQuestion = sampleQ
-                };
-
-                domainDto.Skills.Add(skillDto);
+                    VideoLesson = mat != null ? new CurriculumVideoLessonDto
+                    {
+                        Title = mat.Title,
+                        Teacher = "Ban Chuyên Môn",
+                        Duration = $"{Math.Max(10, mat.DurationSeconds / 60)} phút",
+                        DurationSeconds = mat.DurationSeconds,
+                        Views = "Cơ sở dữ liệu",
+                        VideoUrl = mat.VideoUrl
+                    } : null,
+                    SampleQuestion = q != null ? new CurriculumSampleQuestionDto
+                    {
+                        QuestionId = q.QuestionId.ToString(),
+                        Content = q.ContentLatex,
+                        Options = new List<string> { $"A. {q.OptionA}", $"B. {q.OptionB}", $"C. {q.OptionC}", $"D. {q.OptionD}" },
+                        Correct = q.CorrectOption switch { 'A' => 0, 'B' => 1, 'C' => 2, 'D' => 3, _ => 0 },
+                        Explanation = q.Explanation ?? ""
+                    } : null
+                });
             }
 
             resultList.Add(domainDto);
@@ -138,285 +195,134 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
         return Result<List<CurriculumDomainDto>>.Success(resultList);
     }
 
-    private static (string DomainCode, string Title, string Subtitle, string Icon, string Gradient, string ActiveBg) ResolveDomainMetadata(Guid domainId, string domainName)
+    private static CurriculumPatternDto BuildPatternFromEntity(Skill s, string code)
     {
-        string idStr = domainId.ToString().ToLowerInvariant();
-        if (idStr == "6f3765db-943e-4810-bf74-d6a8bdc215da" || domainName.Contains("Toán", StringComparison.OrdinalIgnoreCase))
+        var mat = s.Materials.FirstOrDefault();
+        var q = s.Questions.FirstOrDefault();
+
+        string theory = "Kiến thức nền tảng trong cơ sở dữ liệu.";
+        string method = "Phương pháp giải chi tiết trong cơ sở dữ liệu.";
+
+        if (mat != null && !string.IsNullOrWhiteSpace(mat.Content))
         {
-            return ("MATH_LOGIC", "Toán học & Tư duy định lượng", "30 câu • Trọng số 300/1200 điểm", "Cpu", "from-blue-600 via-indigo-600 to-cyan-500", "bg-blue-50 border-blue-200 text-blue-700");
-        }
-        if (idStr == "b581ee4c-7277-4be8-a156-c5b20a0a59f6" || domainName.Contains("Ngôn ngữ", StringComparison.OrdinalIgnoreCase))
-        {
-            return ("LANGUAGE", "Sử dụng Ngôn ngữ (Việt - Anh)", "40 câu • Trọng số 400/1200 điểm", "BookOpen", "from-emerald-600 via-teal-600 to-green-500", "bg-emerald-50 border-emerald-200 text-emerald-700");
-        }
-        if (idStr == "77777777-7777-7777-7777-000000000001" || domainName.Contains("tự nhiên", StringComparison.OrdinalIgnoreCase))
-        {
-            return ("NATURAL_SCIENCES", "Khoa học Tự nhiên", "30 câu • Trọng số 300/1200 điểm", "Atom", "from-amber-600 via-orange-600 to-rose-500", "bg-amber-50 border-amber-200 text-amber-700");
-        }
-        if (idStr == "77777777-7777-7777-7777-000000000002" || domainName.Contains("xã hội", StringComparison.OrdinalIgnoreCase))
-        {
-            return ("SOCIAL_SCIENCES", "Khoa học Xã hội & Lịch sử Địa lý", "20 câu • Trọng số 200/1200 điểm", "BarChart2", "from-violet-600 via-purple-600 to-pink-500", "bg-purple-50 border-purple-200 text-purple-700");
+            var content = mat.Content;
+            if (content.Contains("### 2."))
+            {
+                var parts = Regex.Split(content, @"###\s*2\.\s*");
+                if (parts.Length > 1)
+                {
+                    theory = parts[0].Trim();
+                    method = parts[1].Trim();
+                }
+                else
+                {
+                    theory = content;
+                }
+            }
+            else
+            {
+                theory = content;
+            }
+
+            // Dọn dẹp tiêu đề markdown để giảng viên và học sinh xem/hiệu đính tinh gọn
+            if (theory.StartsWith("### 1."))
+            {
+                var newlineIdx = theory.IndexOf('\n');
+                if (newlineIdx >= 0) theory = theory.Substring(newlineIdx + 1).Trim();
+            }
+            if (method.StartsWith("Phương pháp giải"))
+            {
+                var newlineIdx = method.IndexOf('\n');
+                if (newlineIdx >= 0) method = method.Substring(newlineIdx + 1).Trim();
+            }
         }
 
-        return ("GENERAL", domainName, "Chuyên đề khảo thí", "Layers", "from-slate-700 to-slate-900", "bg-slate-50 border-slate-200 text-slate-700");
+        return new CurriculumPatternDto
+        {
+            PatternId = s.SkillId.ToString(),
+            Name = s.Name,
+            Code = code,
+            Level = q != null ? $"Bloom L{q.DifficultyLevel}" : "Vận dụng",
+            Weight = $"{Math.Round((s.Weight ?? 0.05) * 100)}%",
+            TheoryRecap = theory,
+            SolutionMethod = method,
+            KeyFormulas = ExtractFormulasFromContent(mat?.Content),
+            CrossModel = mat?.Title ?? "",
+            CrossNote = "",
+            PrerequisiteIds = s.Prerequisites.Select(p => p.PrerequisiteId.ToString()).ToList(),
+            VideoLesson = mat != null ? new CurriculumVideoLessonDto
+            {
+                Title = mat.Title,
+                Teacher = "Ban Chuyên Môn",
+                Duration = $"{Math.Max(10, mat.DurationSeconds / 60)} phút",
+                DurationSeconds = mat.DurationSeconds,
+                Views = "Cơ sở dữ liệu",
+                VideoUrl = mat.VideoUrl
+            } : null,
+            SampleQuestion = q != null ? new CurriculumSampleQuestionDto
+            {
+                QuestionId = q.QuestionId.ToString(),
+                Content = q.ContentLatex,
+                Options = new List<string> { $"A. {q.OptionA}", $"B. {q.OptionB}", $"C. {q.OptionC}", $"D. {q.OptionD}" },
+                Correct = q.CorrectOption switch { 'A' => 0, 'B' => 1, 'C' => 2, 'D' => 3, _ => 0 },
+                Explanation = q.Explanation ?? ""
+            } : null,
+            QuestionBankCount = s.Questions.Count
+        };
     }
 
-    private static (string Code, string Level, string CrossModel, string CrossNote, string Theory, List<CurriculumFormulaDto> KeyFormulas, CurriculumVideoLessonDto VideoLesson, CurriculumSampleQuestionDto SampleQuestion) ResolveSkillMetadata(Guid skillId, string skillName, string domainCode)
+    private static List<CurriculumFormulaDto> ExtractFormulasFromContent(string? content)
     {
-        string nameLower = skillName.ToLowerInvariant();
+        var list = new List<CurriculumFormulaDto>();
+        if (string.IsNullOrWhiteSpace(content)) return list;
 
-        if (nameLower.Contains("đạo hàm") || nameLower.Contains("hàm số"))
+        // Trích xuất công thức LaTeX $$...$$ hoặc $...$ từ content nếu có
+        var matches = Regex.Matches(content, @"\$\$(.+?)\$\$");
+        int count = 1;
+        foreach (Match match in matches)
         {
-            return (
-                "MATH_01",
-                "Vận dụng",
-                "Mô hình Tốc độ Biến thiên Tức thời (Instantaneous Rate of Change)",
-                "Công thức f'(x) được kế thừa trực tiếp trong Vật lý (v = s'(t), a = v'(t)) và Hóa học (Tốc độ phản ứng tức thời v = -d[A]/dt).",
-                "Đạo hàm của hàm số y = f(x) tại điểm x_0 biểu diễn hệ số góc của tiếp tuyến và tốc độ biến thiên tức thời của đại lượng theo thời gian.",
-                new List<CurriculumFormulaDto>
-                {
-                    new() { Label = "Định nghĩa đạo hàm", Latex = "f'(x_0) = \\lim_{\\Delta x \\to 0} \\frac{f(x_0 + \\Delta x) - f(x_0)}{\\Delta x}" },
-                    new() { Label = "Tiếp tuyến đồ thị", Latex = "y - y_0 = f'(x_0)(x - x_0)" },
-                    new() { Label = "Đạo hàm hàm hợp", Latex = "(g(u(x)))' = g'(u) \\cdot u'(x)" }
-                },
-                new CurriculumVideoLessonDto
-                {
-                    Title = "Kỹ thuật giải nhanh Cực trị & Tiệm cận hàm phân thức",
-                    Teacher = "Thầy Phạm Duy • Ban Khảo thí ĐGNL",
-                    Duration = "28 phút",
-                    Views = "3.2k lượt học"
-                },
-                new CurriculumSampleQuestionDto
-                {
-                    QuestionId = skillId.ToString(),
-                    Content = "Cho hàm số y = f(x) có đạo hàm f'(x) = (x - 1)^2 (x^2 - 4). Số điểm cực trị của hàm số đã cho là:",
-                    Options = new List<string> { "A. 1", "B. 2", "C. 3", "D. 4" },
-                    Correct = 1,
-                    Explanation = "Ta có f'(x) = 0 \\iff x = 1 (nghiệm bội chẵn) hoặc x = \\pm 2 (nghiệm đơn). Đạo hàm chỉ đổi dấu khi qua các nghiệm đơn x = 2 và x = -2. Do đó hàm số có đúng 2 điểm cực trị."
-                }
-            );
-        }
-
-        if (nameLower.Contains("hình học") || nameLower.Contains("lượng giác") || nameLower.Contains("tích phân"))
-        {
-            return (
-                "MATH_02",
-                "Vận dụng",
-                "Mô hình Tích lũy Liên tục (Continuous Accumulation)",
-                "Tích phân Riemann là cơ sở tính Công cơ học A = \\int F ds trong Vật lý và Năng lượng hoạt hóa phản ứng.",
-                "Tích phân xác định biểu thị diện tích hình thang cong giới hạn bởi đường cong y = f(x), trục hoành và hai đường thẳng x = a, x = b.",
-                new List<CurriculumFormulaDto>
-                {
-                    new() { Label = "Công thức Newton-Leibniz", Latex = "\\int_a^b f(x)\\,dx = F(b) - F(a)" },
-                    new() { Label = "Diện tích hình phẳng", Latex = "S = \\int_a^b |f(x) - g(x)|\\,dx" },
-                    new() { Label = "Thể tích khối tròn xoay", Latex = "V = \\pi \\int_a^b [f(x)]^2\\,dx" }
-                },
-                new CurriculumVideoLessonDto
-                {
-                    Title = "Bấm máy tính Casio tối ưu tích phân diện tích hình phẳng",
-                    Teacher = "Cô Nguyễn Mai • Chuyên gia Toán ĐGNL",
-                    Duration = "32 phút",
-                    Views = "4.8k lượt học"
-                },
-                new CurriculumSampleQuestionDto
-                {
-                    QuestionId = skillId.ToString(),
-                    Content = "Diện tích hình phẳng giới hạn bởi đồ thị y = x^2 - 4 và trục hoành y = 0 là:",
-                    Options = new List<string> { "A. \\frac{32}{3}", "B. \\frac{16}{3}", "C. 8", "D. 16" },
-                    Correct = 0,
-                    Explanation = "Phương trình hoành độ giao điểm x^2 - 4 = 0 \\iff x = \\pm 2. Diện tích S = \\int_{-2}^2 |x^2 - 4|\\,dx = 2 \\int_0^2 (4 - x^2)\\,dx = \\frac{32}{3}."
-                }
-            );
-        }
-
-        if (nameLower.Contains("logic") || nameLower.Contains("mệnh đề"))
-        {
-            return (
-                "LOGIC_01",
-                "Thông hiểu & Vận dụng",
-                "Mô hình Đại số Boole & Đồ thị Suy luận (Inference DAG)",
-                "Quy tắc Modus Tollens và bảng chân trị được áp dụng xuyên suốt trong Câu hỏi đọc hiểu Ngôn ngữ và Phân tích quy trình Pháp luật/Khoa học xã hội.",
-                "Suy luận logic mệnh đề tập trung vào tính tương đương của mệnh đề phản đảo (Contrapositive) và quy tắc loại trừ mâu thuẫn.",
-                new List<CurriculumFormulaDto>
-                {
-                    new() { Label = "Mệnh đề kéo theo", Latex = "P \\Rightarrow Q \\equiv \\neg P \\lor Q" },
-                    new() { Label = "Luật phản đảo (Modus Tollens)", Latex = "(P \\Rightarrow Q) \\equiv (\\neg Q \\Rightarrow \\neg P)" },
-                    new() { Label = "Luật De Morgan", Latex = "\\neg (P \\land Q) \\equiv \\neg P \\lor \\neg Q" }
-                },
-                new CurriculumVideoLessonDto
-                {
-                    Title = "Chiến thuật hóa giải 10 dạng bẫy logic ĐHQG-HCM",
-                    Teacher = "Thầy Phạm Duy • Giảng viên Logic ĐGNL",
-                    Duration = "45 phút",
-                    Views = "7.1k lượt học"
-                },
-                new CurriculumSampleQuestionDto
-                {
-                    QuestionId = skillId.ToString(),
-                    Content = "Cho phát biểu: 'Nếu A đạt trên 850 điểm ĐGNL thì A trúng tuyển vào ĐH Bách Khoa'. Phát biểu nào sau đây có giá trị logic TƯƠNG ĐƯƠNG?",
-                    Options = new List<string>
-                    {
-                        "A. Nếu A trúng tuyển vào ĐH Bách Khoa thì A đạt trên 850 điểm",
-                        "B. Nếu A không trúng tuyển vào ĐH Bách Khoa thì A không đạt trên 850 điểm",
-                        "C. Nếu A không đạt trên 850 điểm thì A không trúng tuyển",
-                        "D. A đạt dưới 850 điểm hoặc A không trúng tuyển"
-                    },
-                    Correct = 1,
-                    Explanation = "Mệnh đề dạng P \\Rightarrow Q luôn tương đương với mệnh đề phản đảo \\neg Q \\Rightarrow \\neg P. Do đó câu B là phương án chính xác."
-                }
-            );
-        }
-
-        if (nameLower.Contains("số liệu") || nameLower.Contains("bảng biểu"))
-        {
-            return (
-                "DATA_01",
-                "Thông hiểu & Vận dụng",
-                "Mô hình Tăng trưởng Tương đối & Chỉ số Chuẩn hóa",
-                "Công thức phần trăm tăng trưởng được ứng dụng trực tiếp trong Kinh tế học, Địa lý kinh tế và Hóa sinh thực nghiệm.",
-                "Kỹ thuật tính tốc độ tăng trưởng, tỷ trọng cơ cấu, giá trị tuyệt đối và tốc độ tăng trưởng bình quân hàng năm qua các mốc thời gian.",
-                new List<CurriculumFormulaDto>
-                {
-                    new() { Label = "Tốc độ tăng trưởng", Latex = "g = \\frac{Y_t - Y_{t-1}}{Y_{t-1}} \\times 100\\%" },
-                    new() { Label = "Tỷ trọng cơ cấu", Latex = "P_i = \\frac{X_i}{\\sum X_k} \\times 100\\%" }
-                },
-                new CurriculumVideoLessonDto
-                {
-                    Title = "Mẹo tính nhẩm nhanh số liệu biểu đồ không cần bấm máy",
-                    Teacher = "Thầy Trần Đức • Chuyên gia Phân tích Số liệu",
-                    Duration = "20 phút",
-                    Views = "4.1k lượt học"
-                },
-                new CurriculumSampleQuestionDto
-                {
-                    QuestionId = skillId.ToString(),
-                    Content = "Năm 2023, doanh thu của công ty A là 50 tỷ đồng. Năm 2024, doanh thu đạt 65 tỷ đồng. Tốc độ tăng trưởng doanh thu là:",
-                    Options = new List<string> { "A. 15%", "B. 25%", "C. 30%", "D. 35%" },
-                    Correct = 2,
-                    Explanation = "Áp dụng công thức tăng trưởng: g = (65 - 50) / 50 * 100% = 30%."
-                }
-            );
-        }
-
-        if (nameLower.Contains("tiếng việt"))
-        {
-            return (
-                "VIET_01",
-                "Thông hiểu",
-                "Phân tích Ngữ nghĩa & Ngữ cảnh (Semantic Context Analysis)",
-                "Liên hệ trực tiếp với kỹ năng đọc hiểu văn bản khoa học lịch sử, địa lý và đề xuất luận điểm logic.",
-                "Hệ thống các biện pháp tu từ từ vựng và cú pháp trong các phong cách ngôn ngữ chức năng.",
-                new List<CurriculumFormulaDto>
-                {
-                    new() { Label = "Cấu trúc ẩn dụ", Latex = "\\text{Vế A (ẩn)} \\longleftrightarrow \\text{Vế B (xuất hiện qua nét tương đồng)}" },
-                    new() { Label = "Cấu trúc hoán dụ", Latex = "\\text{Vế A} \\longleftrightarrow \\text{Vế B (xuất hiện qua nét tương cận)}" }
-                },
-                new CurriculumVideoLessonDto
-                {
-                    Title = "Phân biệt Ẩn dụ và Hoán dụ trong 3 giây không bao giờ nhầm",
-                    Teacher = "Thạc sĩ Lê Thanh • Thủ khoa Ngữ văn",
-                    Duration = "22 phút",
-                    Views = "5.4k lượt học"
-                },
-                new CurriculumSampleQuestionDto
-                {
-                    QuestionId = skillId.ToString(),
-                    Content = "Trong câu thơ 'Áo chàm đưa buổi phân ly / Cầm tay nhau biết nói gì hôm nay', cụm từ 'Áo chàm' sử dụng biện pháp tu từ nào?",
-                    Options = new List<string> { "A. Ẩn dụ", "B. Hoán dụ", "C. So sánh", "D. Điệp ngữ" },
-                    Correct = 1,
-                    Explanation = "‘Áo chàm’ chỉ đồng bào Việt Bắc dựa trên mối quan hệ tương cận nên là Hoán dụ."
-                }
-            );
-        }
-
-        if (nameLower.Contains("tiếng anh"))
-        {
-            return (
-                "ENG_01",
-                "Vận dụng",
-                "Mô hình Khớp Đồ thị Cú pháp (Syntactic Dependency Parsing)",
-                "Cấu trúc liên từ logic (However, Therefore, Although) tương đương với toán tử logic mệnh đề trong Toán học.",
-                "Kỹ năng Skimming & Scanning, nhận diện ý chính, thái độ tác giả và lỗi sai ngữ pháp đảo ngữ, câu điều kiện.",
-                new List<CurriculumFormulaDto>
-                {
-                    new() { Label = "Inversion Structure", Latex = "\\text{Negative Adverb} + \\text{Auxiliary} + S + V" },
-                    new() { Label = "Mixed Conditional", Latex = "\\text{If} + S + \\text{had} + V_3, S + \\text{would} + V_0" }
-                },
-                new CurriculumVideoLessonDto
-                {
-                    Title = "Chiến thuật xử lý bài đọc hiểu tiếng Anh 500 từ trong 4 phút",
-                    Teacher = "Cô Emily Vũ • 8.5 IELTS",
-                    Duration = "25 phút",
-                    Views = "6.9k lượt học"
-                },
-                new CurriculumSampleQuestionDto
-                {
-                    QuestionId = skillId.ToString(),
-                    Content = "Choose the correct sentence: 'Not only ______ the exam with flying colors, but he also received a full scholarship.'",
-                    Options = new List<string> { "A. he passed", "B. did he pass", "C. had he passed", "D. he had passed" },
-                    Correct = 1,
-                    Explanation = "Đứng đầu câu là cụm phủ định 'Not only', ta bắt buộc phải dùng cấu trúc đảo ngữ: did + he + pass."
-                }
-            );
-        }
-
-        if (nameLower.Contains("vật lý") || nameLower.Contains("hóa học"))
-        {
-            return (
-                "SCI_01",
-                "Vận dụng",
-                "Mô hình Bảo toàn Năng lượng & Phương trình Vi phân Bậc 1",
-                "GraphRAG kết nối: Phương trình dao động điều hòa x'' + \\omega^2 x = 0 tương đương dao động mạch LC và phương trình cân bằng hóa học.",
-                "Quy luật biến thiên chu kỳ, bảo toàn cơ năng và phương trình tốc độ phản ứng Arrhenius.",
-                new List<CurriculumFormulaDto>
-                {
-                    new() { Label = "Phương trình dao động", Latex = "x(t) = A \\cos(\\omega t + \\varphi)" },
-                    new() { Label = "Bảo toàn cơ năng", Latex = "W = \\frac{1}{2}mv^2 + \\frac{1}{2}kx^2 = \\text{const}" }
-                },
-                new CurriculumVideoLessonDto
-                {
-                    Title = "Chuỗi 5 dạng bài liên môn Vật lý - Hóa học thường gặp trong ĐGNL",
-                    Teacher = "Thầy Vũ Quốc • Thủ khoa KHTN",
-                    Duration = "35 phút",
-                    Views = "5.1k lượt học"
-                },
-                new CurriculumSampleQuestionDto
-                {
-                    QuestionId = skillId.ToString(),
-                    Content = "Một con lắc lò xo có độ cứng k = 100 N/m, khối lượng vật m = 0.1 kg dao động điều hòa. Chu kỳ dao động T xấp xỉ bằng:",
-                    Options = new List<string> { "A. 0.20 s", "B. 0.31 s", "C. 0.50 s", "D. 0.63 s" },
-                    Correct = 0,
-                    Explanation = "Công thức chu kỳ con lắc lò xo: T = 2\\pi \\sqrt{\\frac{m}{k}} \\approx 0.20\\text{ giây}."
-                }
-            );
-        }
-
-        // Mặc định
-        return (
-            $"SKILL_{skillId.ToString()[..4].ToUpperInvariant()}",
-            "Vận dụng",
-            "Mô hình Tri Thức Chuẩn Hóa V-ACT",
-            "Đồ thị tri thức kết nối logic đa môn theo chuẩn bài thi ĐHQG-HCM.",
-            "Nắm vững bản chất định lý, nguyên lý vận hành và ứng dụng thực tiễn giải quyết bài toán phức hợp.",
-            new List<CurriculumFormulaDto>
+            if (match.Groups.Count > 1)
             {
-                new() { Label = "Định luật bảo toàn / Cân bằng", Latex = "\\sum X_i = \\text{const}" }
-            },
-            new CurriculumVideoLessonDto
-            {
-                Title = $"Bài giảng chuyên đề: {skillName}",
-                Teacher = "Ban Học Thuật ĐGNL",
-                Duration = "25 phút",
-                Views = "2.8k lượt học"
-            },
-            new CurriculumSampleQuestionDto
-            {
-                QuestionId = skillId.ToString(),
-                Content = $"Ứng dụng kỹ năng '{skillName}' để giải quyết bài toán khảo thí tổng hợp.",
-                Options = new List<string> { "A. Phương án A", "B. Phương án B", "C. Phương án C", "D. Phương án D" },
-                Correct = 0,
-                Explanation = "Phân tích điều kiện khả vi và tính bảo toàn năng lượng tương ứng."
+                list.Add(new CurriculumFormulaDto
+                {
+                    Label = $"Công thức {count++}",
+                    Latex = match.Groups[1].Value.Trim()
+                });
             }
-        );
+        }
+        return list;
+    }
+
+    private static string ResolveDomainCode(Guid domainId, string domainName)
+    {
+        string name = domainName.ToLowerInvariant();
+        if (name.Contains("toán") || name.Contains("logic")) return "MATH_LOGIC";
+        if (name.Contains("ngôn ngữ") || name.Contains("tiếng")) return "LANGUAGE";
+        if (name.Contains("tự nhiên")) return "NATURAL_SCIENCES";
+        if (name.Contains("xã hội")) return "SOCIAL_SCIENCES";
+        return "GENERAL";
+    }
+
+    private static (string Icon, string Gradient, string ActiveBg) ResolveDomainVisuals(string domainName)
+    {
+        string name = domainName.ToLowerInvariant();
+        if (name.Contains("toán") || name.Contains("logic"))
+        {
+            return ("Cpu", "from-blue-600 via-indigo-600 to-cyan-500", "bg-blue-50 border-blue-200 text-blue-700");
+        }
+        if (name.Contains("ngôn ngữ") || name.Contains("tiếng"))
+        {
+            return ("BookOpen", "from-emerald-600 via-teal-600 to-green-500", "bg-emerald-50 border-emerald-200 text-emerald-700");
+        }
+        if (name.Contains("tự nhiên"))
+        {
+            return ("Atom", "from-amber-600 via-orange-600 to-rose-500", "bg-amber-50 border-amber-200 text-amber-700");
+        }
+        if (name.Contains("xã hội"))
+        {
+            return ("BarChart2", "from-violet-600 via-purple-600 to-pink-500", "bg-purple-50 border-purple-200 text-purple-700");
+        }
+
+        return ("Layers", "from-slate-700 to-slate-900", "bg-slate-50 border-slate-200 text-slate-700");
     }
 }
