@@ -57,5 +57,6 @@
 | 26 | **Core Flow 2 - API 20: Tạo Bài Giảng Video Lý Thuyết** | `MaterialsController.cs` & `CreateMaterialCommandHandler.cs` | 🟢 Hoàn thành | 100% | `POST /api/content/materials` tạo và liên kết bài giảng video lý thuyết chuẩn (`Title`, `VideoUrl`, `DurationSeconds`) |
 | 27 | **Core Flow 2 - API 21: Tra Cứu Video Bài Giảng Kỹ Năng**| `MaterialsController.cs` & `GetMaterialsBySkillQueryHandler.cs` | 🟢 Hoàn thành | 100% | `GET /api/content/materials/by-skill/{skillId}` tra cứu video bài giảng lý thuyết theo kỹ năng chặng học |
 | 28 | **Core Flow 2 (Thematic Cohort - Bước 2): Bổ Sung DomainCode Vào gRPC GetSkillsTree** | `Protos/content.proto` & `API/Services/ContentGrpcService.cs` | 🟢 Hoàn thành | 100% | Mở rộng message `SkillNode` bổ sung `domain_code`, ánh xạ mã miền chuẩn cho 12 kỹ năng DAG |
+| 29 | **Dàn Kiến Thức & Khung Tri Thức Động (Curriculum API)** | `CurriculumController.cs` & `GetCurriculumTreeQuery.cs` | 🟢 Hoàn thành | 100% | `GET /api/content/curriculum` cung cấp cấu trúc 4 miền, 12 kỹ năng chuẩn, công thức KaTeX và GraphRAG từ CSDL |
 
 

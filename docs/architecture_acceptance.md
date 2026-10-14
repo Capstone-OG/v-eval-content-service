@@ -108,3 +108,11 @@ To avoid architectural ambiguity, the system establishes a clear dual ingestion 
 - **Design Alignment**: 100% aligned with Clean Architecture, CQRS (MediatR), Result Pattern, and RFC 7807 ProblemDetails error handling.
 - **Inter-Service Handshake**: Formalized integration contract between Content Service (APIs 16-19) and Practice Service (Micro-group Clustering & Worksheet Assignment).
 - **Implementation Status**: 100% Completed on feature branch `ThinhTT/feature-question-bank-adaptive-quiz` with 0 Warnings and 0 Errors.
+
+---
+
+## 6. CURRICULUM TREE & KNOWLEDGE ONTOLOGY API (REST ENDPOINT)
+- **Endpoint**: `GET /api/content/curriculum` (`CurriculumController.cs`).
+- **Architectural Rationale**: Exposes the complete 4-domain competency taxonomy and 12 standard V-ACT competencies directly from Content Service database to the Web Client through YARP Gateway, completely eliminating any hardcoded curriculum structures on the frontend.
+- **Data Encapsulation**: Delivers domain metadata, competency weights, Bloom cognitive levels, KaTeX formulas, Cross-Disciplinary GraphRAG models, prerequisite relationships, sample questions, and video lecture references dynamically.
+
