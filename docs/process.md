@@ -61,5 +61,6 @@
 | 30 | **Phân Cấp Tri Thức SGK 3 Tầng & 4 Khối Sư Phạm Động 100%** | `CurriculumController.cs` & `GetCurriculumTreeQuery.cs` | 🟢 Hoàn thành | 100% | Cấu trúc Chương -> Bài -> Dạng bài kèm 4 khối: Nền tảng SGK, Phương pháp riêng, Video giảng, Quiz thích ứng (truy vấn CSDL 100%, xóa bỏ toàn bộ hardcode C#) |
 | 31 | **Nạp Tri Thức Động Kép (Giảng Viên & AI Ingestion)** | `ImportCurriculumCommand.cs` & `CurriculumController.cs` | 🟢 Hoàn thành | 100% | `POST /api/content/curriculum/import` tiếp nhận dữ liệu phân cấp tri thức từ Giảng viên hoặc AI OCR SGK |
 | 32 | **Bộ REST APIs Hiệu Đính Sư Phạm Dành Riêng Cho Giảng Viên** | `Commands/UpdatePattern/`, `UpdateNode/`, `CreateNode/`, `DeleteNode/` | 🟢 Hoàn thành | 100% | `PUT patterns/{id}`, `PUT nodes/{id}`, `POST nodes`, `DELETE nodes/{id}` hỗ trợ giảng viên toàn quyền hiệu đính 4 khối nội dung sau khi AI nạp |
+| 33 | **Bộ Chuyển Đổi Dữ Liệu Universal Ingestion (0% Hardcode)** | `FlexibleCharJsonConverter.cs` & `ImportCurriculumCommandHandler.cs` | 🟢 Hoàn thành | 100% | Tiếp nhận linh hoạt mọi định dạng đáp án đúng (`"A."`, `"Đáp án B"`, `0..3`, `null`) từ AI OCR mà không bị lỗi System.Char conversion (0% hardcode) |
 
 

@@ -179,6 +179,9 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                             var existingQ = await _context.Questions.FindAsync(new object[] { qId }, cancellationToken);
                             if (existingQ == null)
                             {
+                                char safeCorrect = char.ToUpperInvariant(qDto.CorrectOption);
+                                if (safeCorrect < 'A' || safeCorrect > 'D') safeCorrect = 'A';
+
                                 var q = new Question
                                 {
                                     QuestionId = qId,
@@ -189,7 +192,7 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                                     OptionB = qDto.OptionB,
                                     OptionC = qDto.OptionC,
                                     OptionD = qDto.OptionD,
-                                    CorrectOption = qDto.CorrectOption,
+                                    CorrectOption = safeCorrect,
                                     Explanation = qDto.Explanation,
                                     CreatedAt = DateTime.UtcNow
                                 };
@@ -197,12 +200,15 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                             }
                             else
                             {
+                                char safeCorrect = char.ToUpperInvariant(qDto.CorrectOption);
+                                if (safeCorrect < 'A' || safeCorrect > 'D') safeCorrect = 'A';
+
                                 existingQ.ContentLatex = qDto.ContentLatex;
                                 existingQ.OptionA = qDto.OptionA;
                                 existingQ.OptionB = qDto.OptionB;
                                 existingQ.OptionC = qDto.OptionC;
                                 existingQ.OptionD = qDto.OptionD;
-                                existingQ.CorrectOption = qDto.CorrectOption;
+                                existingQ.CorrectOption = safeCorrect;
                                 existingQ.Explanation = qDto.Explanation;
                                 existingQ.DifficultyLevel = qDto.DifficultyLevel;
                             }

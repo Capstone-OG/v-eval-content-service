@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
+using V_Eval_Content_Service.Application.Common.Converters;
 
 namespace V_Eval_Content_Service.Application.Curriculum.DTOs;
 
@@ -160,6 +162,7 @@ public class ImportQuestionDto
     public string OptionB { get; set; } = string.Empty;
     public string OptionC { get; set; } = string.Empty;
     public string OptionD { get; set; } = string.Empty;
+    [JsonConverter(typeof(FlexibleCharJsonConverter))]
     public char CorrectOption { get; set; } = 'A';
     public string? Explanation { get; set; }
 }

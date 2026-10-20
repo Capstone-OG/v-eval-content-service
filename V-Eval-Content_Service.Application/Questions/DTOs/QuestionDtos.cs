@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
+using V_Eval_Content_Service.Application.Common.Converters;
 
 namespace V_Eval_Content_Service.Application.Questions.DTOs;
 
@@ -26,6 +28,7 @@ public class CreateQuestionRequestDto
     public string OptionB { get; set; } = string.Empty;
     public string OptionC { get; set; } = string.Empty;
     public string OptionD { get; set; } = string.Empty;
+    [JsonConverter(typeof(FlexibleCharJsonConverter))]
     public char CorrectOption { get; set; } // 'A', 'B', 'C', 'D'
     public string? Explanation { get; set; }
 }
@@ -43,6 +46,7 @@ public class UpdateQuestionRequestDto
     public string OptionB { get; set; } = string.Empty;
     public string OptionC { get; set; } = string.Empty;
     public string OptionD { get; set; } = string.Empty;
+    [JsonConverter(typeof(FlexibleCharJsonConverter))]
     public char CorrectOption { get; set; }
     public string? Explanation { get; set; }
 }

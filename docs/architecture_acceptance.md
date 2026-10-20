@@ -145,4 +145,18 @@ To avoid architectural ambiguity, the system establishes a clear dual ingestion 
   - `DELETE /api/content/curriculum/nodes/{id}`: Safely cascades node deletion with clean prerequisite DAG cleanup.
 - **Live Pedagogical Feedback**: Web client integrates instant KaTeX math rendering previews, video embed previews, and AI method templating to maximize instructor productivity.
 
+---
+
+## 9. UNIVERSAL KNOWLEDGE INGESTION PIPELINE & RESILIENT DESERIALIZATION ACCEPTANCE
+- **Problem Statement**:
+  - AI document extraction (Gemini Vision / OCR) and arbitrary user import payloads emit diverse, non-standard representations for multiple-choice answer keys (e.g., `"A."`, `"(B)"`, `"[C]"`, `"Option D"`, `"Đáp án C"`, 0-indexed integers `0..3`, 1-indexed integers `1..4`, or empty strings).
+  - Default .NET `System.Text.Json` converts strings of length != 1 into `System.Char` by throwing a `JsonException`, invalidating model binding and returning HTTP 400 with `"The dto field is required."`
+- **Architectural Solution**:
+  - Implemented `FlexibleCharJsonConverter` and `FlexibleNullableCharJsonConverter` in `V_Eval_Content_Service.Application.Common.Converters`:
+    - Safely unrolls stripped single characters, keyword-bound prefixes (`Đáp án`, `Phương án`, `Option`, `Answer`), ordinal integers, and Unicode characters without throwing exceptions.
+    - Globally registered across all controllers via `builder.Services.AddControllers().AddJsonOptions(...)` and decorated on core DTOs (`ImportQuestionDto`, `CreateQuestionRequestDto`, `UpdateQuestionRequestDto`, `QuestionDto`).
+  - Added multi-layered server-side defensive sanitization in `ImportCurriculumCommandHandler.cs` (`safeCorrect = char.ToUpperInvariant(qDto.CorrectOption)` clamped to `'A'..'D'`).
+- **Zero Hardcoding Compliance**:
+  - Universal for all academic subject domains (Mathematics, Natural Sciences, Language Arts, Social Sciences) with 0 hardcoded switch branches.
+
 
