@@ -1,17 +1,19 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
-## [21/10/2026] - Khắc Phục Lỗi Nạp Tri Thức CSDL & Chuẩn Hóa Toàn Diện Bộ Chuyển Đổi Dữ Liệu Universal Ingestion (0% Hardcode)
+## [21/10/2026] - Khắc Phục Triệt Để Lỗi 400 Validation (TheoryRecap & System.Char) & Phòng Thủ Toàn Diện Pipeline Nạp Tri Thức CSDL
 
+- **Khắc Phục Triệt Để Lỗi 400 Validation Error (`The TheoryRecap field is required`)**:
+  - Phát hiện nguyên nhân: Trong `CurriculumDtos.cs`, các trường `TheoryRecap`, `SolutionMethod`, `PatternName` được khai báo là non-nullable reference type (`string`), khiến model validation của ASP.NET Core 9 tự động coi là `[Required]`. Khi AI Engine OCR hoặc phía Client truyền `null` (hoặc chuỗi rỗng khi dạng bài không có lý thuyết riêng), ASP.NET Core tự động chặn và trả về HTTP 400 Bad Request.
+  - Tái cấu trúc các DTOs nạp tri thức: Chuyển toàn bộ các trường sang kiểu `string?` kết hợp chuỗi fallback an toàn.
+  - Bổ sung cơ chế phòng thủ đa tầng tại `ImportCurriculumCommandHandler.cs`: Tự động gán nhãn dự phòng khi AI trích xuất thiếu dữ liệu (`"Dạng bài chưa đặt tên"`, `"(Đang cập nhật lý thuyết SGK)"`, `"(Đang cập nhật phương pháp giải)"`), duyệt an toàn danh sách câu hỏi và kỹ năng tiên quyết rỗng.
 - **Khắc Phục Triệt Để Lỗi 400 Validation Error (`The JSON value could not be converted to System.Char`)**:
-  - Phát hiện nguyên nhân gốc rễ: Trường `CorrectOption` trong DTOs (`ImportQuestionDto`, `CreateQuestionRequestDto`, `UpdateQuestionRequestDto`, `QuestionDto`) được định nghĩa kiểu `char`, khiến `System.Text.Json` mặc định ném lỗi khi gặp chuỗi có độ dài khác 1 (ví dụ `"A."`, `"Đáp án C"`, `"Phương án B"`, `""`) hoặc dạng số nguyên (`0`, `1`, `2`, `3`) do AI OCR hay tài liệu trích xuất sinh ra.
-  - Xây dựng bộ converter `FlexibleCharJsonConverter` và `FlexibleNullableCharJsonConverter` trong `V_Eval_Content_Service.Application.Common.Converters`:
-    - Tự động bóc tách và chuẩn hóa mọi định dạng: Ký tự kèm dấu bao quanh (`"A."`, `"(B)"`, `"[C]"`, `"D:"`), chuỗi từ khóa (`"Đáp án A"`, `"Phương án B"`, `"Option C"`, `"Answer D"`), số nguyên (`0..3` ánh xạ sang `'A'..'D'`), ký tự Unicode hoặc `null`/chuỗi rỗng mà không bao giờ ném ngoại lệ.
+  - Xây dựng bộ converter `FlexibleCharJsonConverter` và `FlexibleNullableCharJsonConverter` trong `V_Eval_Content_Service.Application.Common.Converters`: Tự động bóc tách và chuẩn hóa mọi định dạng: Ký tự kèm dấu bao quanh (`"A."`, `"(B)"`, `"[C]"`, `"D:"`), chuỗi từ khóa (`"Đáp án A"`, `"Phương án B"`, `"Option C"`), số nguyên (`0..3` ánh xạ sang `'A'..'D'`), ký tự Unicode hoặc `null`/chuỗi rỗng mà không bao giờ ném ngoại lệ.
   - Đăng ký bộ converter toàn cục tại `Program.cs` (`AddJsonOptions`) và đánh dấu thuộc tính `[JsonConverter(typeof(FlexibleCharJsonConverter))]` trên các DTO trọng yếu.
 - **Phòng Thủ Đa Tầng Tại Command Handler (`ImportCurriculumCommandHandler.cs`)**:
   - Chuẩn hóa trực tiếp `safeCorrect = char.ToUpperInvariant(qDto.CorrectOption)` và kiểm tra phạm vi `'A'..'D'` trước khi lưu vào thực thể `Question` của PostgreSQL.
 - **Biên Dịch & Kiểm Thử Vận Hành**:
-  - Toàn bộ solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error** trên .NET 9 SDK).
-  - Kiểm thử trực tiếp `POST /api/content/curriculum/import` với mọi định dạng thô (`"A."`, `"Đáp án C"`, `0..3`, `null`, `"(B)"`) đều nạp thành công 200 OK vào CSDL PostgreSQL.
+  - Toàn bộ solution `V-Eval-Content_Service.Application.csproj` biên dịch sạch 100% (**0 Warning, 0 Error** trên .NET 9 SDK).
+  - Kiểm thử trực tiếp `POST /api/content/curriculum/import` với mọi định dạng thô hoặc khuyết thiếu đều nạp thành công 200 OK vào CSDL PostgreSQL.
 
 ---
 

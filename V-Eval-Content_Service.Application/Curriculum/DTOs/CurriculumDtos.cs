@@ -117,7 +117,7 @@ public class CurriculumSampleQuestionDto
 public class ImportCurriculumRequestDto
 {
     public Guid DomainId { get; set; }
-    public string DomainName { get; set; } = string.Empty;
+    public string? DomainName { get; set; }
     public string? DomainDescription { get; set; }
     public List<ImportChapterDto> Chapters { get; set; } = new();
 }
@@ -125,7 +125,7 @@ public class ImportCurriculumRequestDto
 public class ImportChapterDto
 {
     public Guid? ChapterId { get; set; }
-    public string ChapterName { get; set; } = string.Empty;
+    public string? ChapterName { get; set; }
     public double? Weight { get; set; }
     public string? Description { get; set; }
     public List<ImportLessonDto> Lessons { get; set; } = new();
@@ -134,7 +134,7 @@ public class ImportChapterDto
 public class ImportLessonDto
 {
     public Guid? LessonId { get; set; }
-    public string LessonName { get; set; } = string.Empty;
+    public string? LessonName { get; set; }
     public double? Weight { get; set; }
     public string? Summary { get; set; }
     public List<ImportPatternDto> Patterns { get; set; } = new();
@@ -143,10 +143,10 @@ public class ImportLessonDto
 public class ImportPatternDto
 {
     public Guid? PatternId { get; set; }
-    public string PatternName { get; set; } = string.Empty;
+    public string? PatternName { get; set; }
     public double? Weight { get; set; }
-    public string TheoryRecap { get; set; } = string.Empty;
-    public string SolutionMethod { get; set; } = string.Empty;
+    public string? TheoryRecap { get; set; }
+    public string? SolutionMethod { get; set; }
     public string? VideoUrl { get; set; }
     public int DurationSeconds { get; set; } = 0;
     public List<Guid> PrerequisiteSkillIds { get; set; } = new();
@@ -157,11 +157,11 @@ public class ImportQuestionDto
 {
     public Guid? QuestionId { get; set; }
     public int DifficultyLevel { get; set; } = 2;
-    public string ContentLatex { get; set; } = string.Empty;
-    public string OptionA { get; set; } = string.Empty;
-    public string OptionB { get; set; } = string.Empty;
-    public string OptionC { get; set; } = string.Empty;
-    public string OptionD { get; set; } = string.Empty;
+    public string? ContentLatex { get; set; }
+    public string? OptionA { get; set; }
+    public string? OptionB { get; set; }
+    public string? OptionC { get; set; }
+    public string? OptionD { get; set; }
     [JsonConverter(typeof(FlexibleCharJsonConverter))]
     public char CorrectOption { get; set; } = 'A';
     public string? Explanation { get; set; }

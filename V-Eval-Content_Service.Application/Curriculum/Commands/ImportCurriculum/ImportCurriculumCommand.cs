@@ -69,9 +69,10 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
             int questionsCount = 0;
 
             // 2. Lặp qua các Chương (Chapters)
-            foreach (var chapDto in dto.Chapters)
+            foreach (var chapDto in dto.Chapters ?? Enumerable.Empty<ImportChapterDto>())
             {
                 var chapId = chapDto.ChapterId ?? Guid.NewGuid();
+                string chapName = !string.IsNullOrWhiteSpace(chapDto.ChapterName) ? chapDto.ChapterName.Trim() : $"Chương {chaptersCount + 1}";
                 var chapterSkill = await _context.Skills.FindAsync(new object[] { chapId }, cancellationToken);
                 if (chapterSkill == null)
                 {
@@ -79,7 +80,7 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                     {
                         SkillId = chapId,
                         DomainId = dto.DomainId,
-                        Name = chapDto.ChapterName,
+                        Name = chapName,
                         ParentId = null,
                         Weight = chapDto.Weight ?? 0.25,
                         CreatedAt = DateTime.UtcNow
@@ -88,15 +89,16 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                 }
                 else
                 {
-                    chapterSkill.Name = chapDto.ChapterName;
+                    chapterSkill.Name = chapName;
                     chapterSkill.Weight = chapDto.Weight ?? chapterSkill.Weight;
                 }
                 chaptersCount++;
 
                 // 3. Lặp qua các Bài học (Lessons)
-                foreach (var lesDto in chapDto.Lessons)
+                foreach (var lesDto in chapDto.Lessons ?? Enumerable.Empty<ImportLessonDto>())
                 {
                     var lesId = lesDto.LessonId ?? Guid.NewGuid();
+                    string lesName = !string.IsNullOrWhiteSpace(lesDto.LessonName) ? lesDto.LessonName.Trim() : $"Bài học {lessonsCount + 1}";
                     var lessonSkill = await _context.Skills.FindAsync(new object[] { lesId }, cancellationToken);
                     if (lessonSkill == null)
                     {
@@ -104,7 +106,7 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                         {
                             SkillId = lesId,
                             DomainId = dto.DomainId,
-                            Name = lesDto.LessonName,
+                            Name = lesName,
                             ParentId = chapId,
                             Weight = lesDto.Weight ?? 0.08,
                             CreatedAt = DateTime.UtcNow
@@ -113,16 +115,17 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                     }
                     else
                     {
-                        lessonSkill.Name = lesDto.LessonName;
+                        lessonSkill.Name = lesName;
                         lessonSkill.ParentId = chapId;
                         lessonSkill.Weight = lesDto.Weight ?? lessonSkill.Weight;
                     }
                     lessonsCount++;
 
                     // 4. Lặp qua các Dạng bài cụ thể (Patterns)
-                    foreach (var patDto in lesDto.Patterns)
+                    foreach (var patDto in lesDto.Patterns ?? Enumerable.Empty<ImportPatternDto>())
                     {
                         var patId = patDto.PatternId ?? Guid.NewGuid();
+                        string patName = !string.IsNullOrWhiteSpace(patDto.PatternName) ? patDto.PatternName.Trim() : $"Dạng bài {patternsCount + 1}";
                         var patternSkill = await _context.Skills.FindAsync(new object[] { patId }, cancellationToken);
                         if (patternSkill == null)
                         {
@@ -130,7 +133,7 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                             {
                                 SkillId = patId,
                                 DomainId = dto.DomainId,
-                                Name = patDto.PatternName,
+                                Name = patName,
                                 ParentId = lesId,
                                 Weight = patDto.Weight ?? 0.04,
                                 CreatedAt = DateTime.UtcNow
@@ -139,7 +142,7 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                         }
                         else
                         {
-                            patternSkill.Name = patDto.PatternName;
+                            patternSkill.Name = patName;
                             patternSkill.ParentId = lesId;
                             patternSkill.Weight = patDto.Weight ?? patternSkill.Weight;
                         }
@@ -147,7 +150,9 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
 
                         // 5. Upsert Material cho Dạng bài (Khối 1 & 2 & 3)
                         var existingMaterial = await _context.Materials.FirstOrDefaultAsync(m => m.SkillId == patId, cancellationToken);
-                        string formattedContent = $"### 1. Kiến thức nền tảng SGK GDPT 2018\n{patDto.TheoryRecap}\n\n### 2. Phương pháp giải chi tiết từng bước\n{patDto.SolutionMethod}";
+                        string theory = !string.IsNullOrWhiteSpace(patDto.TheoryRecap) ? patDto.TheoryRecap.Trim() : "(Đang cập nhật lý thuyết SGK)";
+                        string method = !string.IsNullOrWhiteSpace(patDto.SolutionMethod) ? patDto.SolutionMethod.Trim() : "(Đang cập nhật phương pháp giải)";
+                        string formattedContent = $"### 1. Kiến thức nền tảng SGK GDPT 2018\n{theory}\n\n### 2. Phương pháp giải chi tiết từng bước\n{method}";
 
                         if (existingMaterial == null)
                         {
@@ -155,7 +160,7 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                             {
                                 MaterialId = Guid.NewGuid(),
                                 SkillId = patId,
-                                Title = patDto.PatternName,
+                                Title = patName,
                                 Content = formattedContent,
                                 VideoUrl = patDto.VideoUrl,
                                 DurationSeconds = patDto.DurationSeconds,
@@ -165,7 +170,7 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                         }
                         else
                         {
-                            existingMaterial.Title = patDto.PatternName;
+                            existingMaterial.Title = patName;
                             existingMaterial.Content = formattedContent;
                             if (!string.IsNullOrWhiteSpace(patDto.VideoUrl)) existingMaterial.VideoUrl = patDto.VideoUrl;
                             if (patDto.DurationSeconds > 0) existingMaterial.DurationSeconds = patDto.DurationSeconds;
@@ -173,25 +178,25 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                         materialsCount++;
 
                         // 6. Upsert Questions cho Dạng bài (Khối 4)
-                        foreach (var qDto in patDto.Questions)
+                        foreach (var qDto in patDto.Questions ?? Enumerable.Empty<ImportQuestionDto>())
                         {
                             var qId = qDto.QuestionId ?? Guid.NewGuid();
                             var existingQ = await _context.Questions.FindAsync(new object[] { qId }, cancellationToken);
+                            char safeCorrect = char.ToUpperInvariant(qDto.CorrectOption);
+                            if (safeCorrect < 'A' || safeCorrect > 'D') safeCorrect = 'A';
+
                             if (existingQ == null)
                             {
-                                char safeCorrect = char.ToUpperInvariant(qDto.CorrectOption);
-                                if (safeCorrect < 'A' || safeCorrect > 'D') safeCorrect = 'A';
-
                                 var q = new Question
                                 {
                                     QuestionId = qId,
                                     SkillId = patId,
                                     DifficultyLevel = qDto.DifficultyLevel,
-                                    ContentLatex = qDto.ContentLatex,
-                                    OptionA = qDto.OptionA,
-                                    OptionB = qDto.OptionB,
-                                    OptionC = qDto.OptionC,
-                                    OptionD = qDto.OptionD,
+                                    ContentLatex = qDto.ContentLatex ?? string.Empty,
+                                    OptionA = qDto.OptionA ?? string.Empty,
+                                    OptionB = qDto.OptionB ?? string.Empty,
+                                    OptionC = qDto.OptionC ?? string.Empty,
+                                    OptionD = qDto.OptionD ?? string.Empty,
                                     CorrectOption = safeCorrect,
                                     Explanation = qDto.Explanation,
                                     CreatedAt = DateTime.UtcNow
@@ -200,14 +205,11 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                             }
                             else
                             {
-                                char safeCorrect = char.ToUpperInvariant(qDto.CorrectOption);
-                                if (safeCorrect < 'A' || safeCorrect > 'D') safeCorrect = 'A';
-
-                                existingQ.ContentLatex = qDto.ContentLatex;
-                                existingQ.OptionA = qDto.OptionA;
-                                existingQ.OptionB = qDto.OptionB;
-                                existingQ.OptionC = qDto.OptionC;
-                                existingQ.OptionD = qDto.OptionD;
+                                existingQ.ContentLatex = qDto.ContentLatex ?? string.Empty;
+                                existingQ.OptionA = qDto.OptionA ?? string.Empty;
+                                existingQ.OptionB = qDto.OptionB ?? string.Empty;
+                                existingQ.OptionC = qDto.OptionC ?? string.Empty;
+                                existingQ.OptionD = qDto.OptionD ?? string.Empty;
                                 existingQ.CorrectOption = safeCorrect;
                                 existingQ.Explanation = qDto.Explanation;
                                 existingQ.DifficultyLevel = qDto.DifficultyLevel;
@@ -216,7 +218,7 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
                         }
 
                         // 7. Upsert SkillPrerequisites (DAG Tiên Quyết)
-                        foreach (var prereqId in patDto.PrerequisiteSkillIds)
+                        foreach (var prereqId in patDto.PrerequisiteSkillIds ?? Enumerable.Empty<Guid>())
                         {
                             var existsPrereq = await _context.SkillPrerequisites.AnyAsync(
                                 sp => sp.SkillId == patId && sp.PrerequisiteId == prereqId, cancellationToken);

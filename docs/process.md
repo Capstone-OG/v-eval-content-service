@@ -62,5 +62,6 @@
 | 31 | **Nạp Tri Thức Động Kép (Giảng Viên & AI Ingestion)** | `ImportCurriculumCommand.cs` & `CurriculumController.cs` | 🟢 Hoàn thành | 100% | `POST /api/content/curriculum/import` tiếp nhận dữ liệu phân cấp tri thức từ Giảng viên hoặc AI OCR SGK |
 | 32 | **Bộ REST APIs Hiệu Đính Sư Phạm Dành Riêng Cho Giảng Viên** | `Commands/UpdatePattern/`, `UpdateNode/`, `CreateNode/`, `DeleteNode/` | 🟢 Hoàn thành | 100% | `PUT patterns/{id}`, `PUT nodes/{id}`, `POST nodes`, `DELETE nodes/{id}` hỗ trợ giảng viên toàn quyền hiệu đính 4 khối nội dung sau khi AI nạp |
 | 33 | **Bộ Chuyển Đổi Dữ Liệu Universal Ingestion (0% Hardcode)** | `FlexibleCharJsonConverter.cs` & `ImportCurriculumCommandHandler.cs` | 🟢 Hoàn thành | 100% | Tiếp nhận linh hoạt mọi định dạng đáp án đúng (`"A."`, `"Đáp án B"`, `0..3`, `null`) từ AI OCR mà không bị lỗi System.Char conversion (0% hardcode) |
+| 34 | **Phòng Thủ Toàn Diện Model Validation & Null-Coalescing Import DTOs** | `CurriculumDtos.cs` & `ImportCurriculumCommandHandler.cs` | 🟢 Hoàn thành | 100% | Tái cấu trúc các trường DTO sang nullable (`string?`) kết hợp chuỗi fallback an toàn cho `TheoryRecap`, `SolutionMethod`, `PatternName`, triệt tiêu 100% lỗi HTTP 400 Bad Request |
 
 
