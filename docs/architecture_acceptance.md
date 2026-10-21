@@ -156,7 +156,17 @@ To avoid architectural ambiguity, the system establishes a clear dual ingestion 
     - Safely unrolls stripped single characters, keyword-bound prefixes (`Đáp án`, `Phương án`, `Option`, `Answer`), ordinal integers, and Unicode characters without throwing exceptions.
     - Globally registered across all controllers via `builder.Services.AddControllers().AddJsonOptions(...)` and decorated on core DTOs (`ImportQuestionDto`, `CreateQuestionRequestDto`, `UpdateQuestionRequestDto`, `QuestionDto`).
   - Added multi-layered server-side defensive sanitization in `ImportCurriculumCommandHandler.cs` (`safeCorrect = char.ToUpperInvariant(qDto.CorrectOption)` clamped to `'A'..'D'`).
-- **Zero Hardcoding Compliance**:
-  - Universal for all academic subject domains (Mathematics, Natural Sciences, Language Arts, Social Sciences) with 0 hardcoded switch branches.
+## 10. SYNTHETIC CHAPTER CASCADE DELETION & POLYMORPHIC NODE ID ARCHITECTURE
+- **Problem Statement**:
+  - The curriculum tree hierarchy query (`GetCurriculumTreeQuery.cs`) creates virtual synthetic container chapters (`chap-general-{domainId}`) to logically house flat skills that lack an explicit parent chapter.
+  - When the frontend administrator invokes chapter deletion via `DELETE /api/content/curriculum/nodes/{id}`, the endpoint route previously enforced a Guid regex constraint (`[HttpDelete("nodes/{id:guid}")]`), rejecting synthetic IDs with HTTP 404 Not Found.
+- **Architectural Solution**:
+  - **Polymorphic Route Signature**: Decoupled the route constraint to `[HttpDelete("nodes/{id}")]` accepting string identifiers.
+  - **Command Handler Polymorphism (`DeleteNodeCommandHandler.cs`)**:
+    - Dispatches prefix-based pattern matching on `chap-general-`: Parses the underlying `domainId` and executes an atomic cascade deletion across all root flat skills within the competency domain (`s.DomainId == domainId && s.ParentId == null`), purging associated materials, questions, and DAG graph dependencies.
+    - Preserves standard recursive Guid deletion for standard database nodes (Chapters, Lessons, Skill Patterns).
+- **Zero-Downtime Verification**:
+  - Verified against PostgreSQL Supabase test instances; returned 200 OK with clean database state.
+
 
 

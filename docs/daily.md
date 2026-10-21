@@ -1,5 +1,19 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [22/10/2026] - Khắc Phục Lỗi 404 Khi Xóa Chương Tổng Hợp (Synthetic Chapter Container) & Hỗ Trợ Đa Hình Chuỗi Node ID
+
+- **Khắc Phục Triệt Để Lỗi HTTP 404 Khi Xóa Chương Tổng Hợp (`DELETE /api/content/curriculum/nodes/{id}`)**:
+  - *Nguyên nhân*: Tại `CurriculumController.cs`, route ban đầu đặt ràng buộc kiểu Guid `[HttpDelete("nodes/{id:guid}")]`, trong khi các chương ảo tổng hợp do `GetCurriculumTreeQuery.cs` tạo ra mang định danh dạng chuỗi `chap-general-{domainId}`. Khi client gửi lệnh `DELETE /api/content/curriculum/nodes/chap-general-...`, ASP.NET Core Router từ chối tiếp nhận vì không phải Guid hợp lệ và trả về HTTP 404 Not Found.
+  - *Chuẩn hóa Route & Controller*: Chuyển đổi route thành `[HttpDelete("nodes/{id}")]` với tham số `[FromRoute] string id` tiếp nhận linh hoạt cả Guid thực tế lẫn ID tổng hợp ảo.
+  - *Mở rộng Application Command (`DeleteNodeCommand.cs`)*:
+    - Bổ sung cơ chế nhận diện prefix `chap-general-`: Bóc tách `domainId` và thực hiện cascade delete toàn bộ các kỹ năng phẳng (flat skills) thuộc miền tri thức (`domain.DomainId == domainId && s.ParentId == null`), đồng thời dọn dẹp sạch tài liệu (`Materials`), ngân hàng câu hỏi (`Questions`) và các quan hệ tiên quyết đồ thị (`SkillPrerequisites`) trong CSDL PostgreSQL.
+    - Với các ID dạng Guid hợp lệ: Thực hiện truy vấn xóa đệ quy Node (Chương / Bài học / Dạng bài) và toàn bộ các nhánh con trực thuộc.
+- **Biên Dịch & Kiểm Thử Vận Hành**:
+  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error** trên .NET 9 SDK).
+  - Khởi chạy service thành công trên cổng 5249/5250, kiểm tra lệnh xóa chương tổng hợp hoạt động trơn tru.
+
+---
+
 ## [21/10/2026] - Khắc Phục Triệt Để Lỗi 400 Validation (TheoryRecap & System.Char) & Phòng Thủ Toàn Diện Pipeline Nạp Tri Thức CSDL
 
 - **Khắc Phục Triệt Để Lỗi 400 Validation Error (`The TheoryRecap field is required`)**:

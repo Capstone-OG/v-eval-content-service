@@ -93,11 +93,11 @@ public class CurriculumController : ApiControllerBase
     /// <summary>
     /// Giảng viên xóa một Chương, Bài học hoặc Dạng bài khỏi Cây tri thức
     /// </summary>
-    [HttpDelete("nodes/{id:guid}")]
+    [HttpDelete("nodes/{id}")]
     [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteNode([FromRoute] System.Guid id)
+    public async Task<IActionResult> DeleteNode([FromRoute] string id)
     {
         var result = await Mediator.Send(new V_Eval_Content_Service.Application.Curriculum.Commands.DeleteNode.DeleteNodeCommand(id));
         return HandleResult(result);

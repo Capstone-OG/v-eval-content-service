@@ -63,5 +63,6 @@
 | 32 | **Bộ REST APIs Hiệu Đính Sư Phạm Dành Riêng Cho Giảng Viên** | `Commands/UpdatePattern/`, `UpdateNode/`, `CreateNode/`, `DeleteNode/` | 🟢 Hoàn thành | 100% | `PUT patterns/{id}`, `PUT nodes/{id}`, `POST nodes`, `DELETE nodes/{id}` hỗ trợ giảng viên toàn quyền hiệu đính 4 khối nội dung sau khi AI nạp |
 | 33 | **Bộ Chuyển Đổi Dữ Liệu Universal Ingestion (0% Hardcode)** | `FlexibleCharJsonConverter.cs` & `ImportCurriculumCommandHandler.cs` | 🟢 Hoàn thành | 100% | Tiếp nhận linh hoạt mọi định dạng đáp án đúng (`"A."`, `"Đáp án B"`, `0..3`, `null`) từ AI OCR mà không bị lỗi System.Char conversion (0% hardcode) |
 | 34 | **Phòng Thủ Toàn Diện Model Validation & Null-Coalescing Import DTOs** | `CurriculumDtos.cs` & `ImportCurriculumCommandHandler.cs` | 🟢 Hoàn thành | 100% | Tái cấu trúc các trường DTO sang nullable (`string?`) kết hợp chuỗi fallback an toàn cho `TheoryRecap`, `SolutionMethod`, `PatternName`, triệt tiêu 100% lỗi HTTP 400 Bad Request |
+| 35 | **Xóa Chương Tổng Hợp & Đa Hình Node ID (Synthetic Chapter Cascade)** | `CurriculumController.cs` & `DeleteNodeCommand.cs` | 🟢 Hoàn thành | 100% | Hỗ trợ xóa cả Guid thực tế lẫn synthetic container `chap-general-{domainId}`, cascade xóa toàn bộ flat skills và quan hệ DAG, triệt tiêu lỗi HTTP 404 Not Found |
 
 
