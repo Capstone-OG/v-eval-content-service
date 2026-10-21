@@ -10,6 +10,8 @@ using V_Eval_Content_Service.Application.Diagnostic.Queries.GetDiagnosticTest;
 using V_Eval_Content_Service.Infrastructure.Persistence;
 using V_Eval_Content_Service.Infrastructure.Persistence.Seeds;
 
+using V_Eval_Content_Service.Application.Common.Converters;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Cấu hình Kestrel: Cổng 5249 cho REST/Swagger (HTTP/1), Cổng 5250 cho gRPC Server (HTTP/2)
@@ -19,8 +21,13 @@ builder.WebHost.ConfigureKestrel(options =>
     options.ListenLocalhost(5250, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
 });
 
-// 1. Đăng ký Controllers & API Explorer
-builder.Services.AddControllers();
+// 1. Đăng ký Controllers & API Explorer kèm JsonConverters linh hoạt cho mọi dạng dữ liệu AI / Giảng viên
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new FlexibleCharJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new FlexibleNullableCharJsonConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 
 // 2. Cấu hình Swagger UI trực quan

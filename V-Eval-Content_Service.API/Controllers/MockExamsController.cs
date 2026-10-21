@@ -90,4 +90,35 @@ public class MockExamsController : ApiControllerBase
         }
         return Ok(new { message = "Đã xóa đề thi thành công!", exam_id = id });
     }
+
+    /// <summary>
+    /// Core Flow 2 - API 19: Đóng gói bộ đề Quiz củng cố thích ứng (Adaptive Remedial Quiz / Micro Worksheet)
+    /// </summary>
+    /// <remarks>
+    /// - Nhận danh sách kỹ năng mục tiêu `SkillIds` (hoặc `CommonWeakSkillIds` từ Practice Service micro-grouping).
+    /// - Bốc 5-10 câu hỏi theo dải độ khó Bloom (mặc định Bloom 1-3).
+    /// - Tự động tạo bản ghi `MockExam` loại `QUIZ` phục vụ gán bài tập cho học sinh hoặc bàn học.
+    /// </remarks>
+    [HttpPost("quiz")]
+    [ProducesResponseType(typeof(V_Eval_Content_Service.Application.MockExams.DTOs.QuizExamResponseDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CreateQuizExam([FromBody] V_Eval_Content_Service.Application.MockExams.DTOs.CreateQuizExamRequestDto request)
+    {
+        var command = new V_Eval_Content_Service.Application.MockExams.Commands.CreateQuizExam.CreateQuizExamCommand(
+            Title: request.Title,
+            SkillIds: request.SkillIds,
+            QuestionCount: request.QuestionCount,
+            MinBloomLevel: request.MinBloomLevel,
+            MaxBloomLevel: request.MaxBloomLevel
+        );
+
+        var result = await Mediator.Send(command);
+        if (result.IsSuccess)
+        {
+            return CreatedAtAction(nameof(GetExamById), new { id = result.Value.ExamId }, result.Value);
+        }
+
+        return HandleResult(result);
+    }
 }

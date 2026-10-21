@@ -1,5 +1,106 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [22/10/2026] - Khắc Phục Lỗi 404 Khi Xóa Chương Tổng Hợp (Synthetic Chapter Container) & Hỗ Trợ Đa Hình Chuỗi Node ID
+
+- **Khắc Phục Triệt Để Lỗi HTTP 404 Khi Xóa Chương Tổng Hợp (`DELETE /api/content/curriculum/nodes/{id}`)**:
+  - *Nguyên nhân*: Tại `CurriculumController.cs`, route ban đầu đặt ràng buộc kiểu Guid `[HttpDelete("nodes/{id:guid}")]`, trong khi các chương ảo tổng hợp do `GetCurriculumTreeQuery.cs` tạo ra mang định danh dạng chuỗi `chap-general-{domainId}`. Khi client gửi lệnh `DELETE /api/content/curriculum/nodes/chap-general-...`, ASP.NET Core Router từ chối tiếp nhận vì không phải Guid hợp lệ và trả về HTTP 404 Not Found.
+  - *Chuẩn hóa Route & Controller*: Chuyển đổi route thành `[HttpDelete("nodes/{id}")]` với tham số `[FromRoute] string id` tiếp nhận linh hoạt cả Guid thực tế lẫn ID tổng hợp ảo.
+  - *Mở rộng Application Command (`DeleteNodeCommand.cs`)*:
+    - Bổ sung cơ chế nhận diện prefix `chap-general-`: Bóc tách `domainId` và thực hiện cascade delete toàn bộ các kỹ năng phẳng (flat skills) thuộc miền tri thức (`domain.DomainId == domainId && s.ParentId == null`), đồng thời dọn dẹp sạch tài liệu (`Materials`), ngân hàng câu hỏi (`Questions`) và các quan hệ tiên quyết đồ thị (`SkillPrerequisites`) trong CSDL PostgreSQL.
+    - Với các ID dạng Guid hợp lệ: Thực hiện truy vấn xóa đệ quy Node (Chương / Bài học / Dạng bài) và toàn bộ các nhánh con trực thuộc.
+- **Biên Dịch & Kiểm Thử Vận Hành**:
+  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error** trên .NET 9 SDK).
+  - Khởi chạy service thành công trên cổng 5249/5250, kiểm tra lệnh xóa chương tổng hợp hoạt động trơn tru.
+
+---
+
+## [21/10/2026] - Khắc Phục Triệt Để Lỗi 400 Validation (TheoryRecap & System.Char) & Phòng Thủ Toàn Diện Pipeline Nạp Tri Thức CSDL
+
+- **Khắc Phục Triệt Để Lỗi 400 Validation Error (`The TheoryRecap field is required`)**:
+  - Phát hiện nguyên nhân: Trong `CurriculumDtos.cs`, các trường `TheoryRecap`, `SolutionMethod`, `PatternName` được khai báo là non-nullable reference type (`string`), khiến model validation của ASP.NET Core 9 tự động coi là `[Required]`. Khi AI Engine OCR hoặc phía Client truyền `null` (hoặc chuỗi rỗng khi dạng bài không có lý thuyết riêng), ASP.NET Core tự động chặn và trả về HTTP 400 Bad Request.
+  - Tái cấu trúc các DTOs nạp tri thức: Chuyển toàn bộ các trường sang kiểu `string?` kết hợp chuỗi fallback an toàn.
+  - Bổ sung cơ chế phòng thủ đa tầng tại `ImportCurriculumCommandHandler.cs`: Tự động gán nhãn dự phòng khi AI trích xuất thiếu dữ liệu (`"Dạng bài chưa đặt tên"`, `"(Đang cập nhật lý thuyết SGK)"`, `"(Đang cập nhật phương pháp giải)"`), duyệt an toàn danh sách câu hỏi và kỹ năng tiên quyết rỗng.
+- **Khắc Phục Triệt Để Lỗi 400 Validation Error (`The JSON value could not be converted to System.Char`)**:
+  - Xây dựng bộ converter `FlexibleCharJsonConverter` và `FlexibleNullableCharJsonConverter` trong `V_Eval_Content_Service.Application.Common.Converters`: Tự động bóc tách và chuẩn hóa mọi định dạng: Ký tự kèm dấu bao quanh (`"A."`, `"(B)"`, `"[C]"`, `"D:"`), chuỗi từ khóa (`"Đáp án A"`, `"Phương án B"`, `"Option C"`), số nguyên (`0..3` ánh xạ sang `'A'..'D'`), ký tự Unicode hoặc `null`/chuỗi rỗng mà không bao giờ ném ngoại lệ.
+  - Đăng ký bộ converter toàn cục tại `Program.cs` (`AddJsonOptions`) và đánh dấu thuộc tính `[JsonConverter(typeof(FlexibleCharJsonConverter))]` trên các DTO trọng yếu.
+- **Phòng Thủ Đa Tầng Tại Command Handler (`ImportCurriculumCommandHandler.cs`)**:
+  - Chuẩn hóa trực tiếp `safeCorrect = char.ToUpperInvariant(qDto.CorrectOption)` và kiểm tra phạm vi `'A'..'D'` trước khi lưu vào thực thể `Question` của PostgreSQL.
+- **Biên Dịch & Kiểm Thử Vận Hành**:
+  - Toàn bộ solution `V-Eval-Content_Service.Application.csproj` biên dịch sạch 100% (**0 Warning, 0 Error** trên .NET 9 SDK).
+  - Kiểm thử trực tiếp `POST /api/content/curriculum/import` với mọi định dạng thô hoặc khuyết thiếu đều nạp thành công 200 OK vào CSDL PostgreSQL.
+
+---
+
+## [15/10/2026] - Triển Khai Kiến Trúc Nạp Tri Thức Động Kép (Giảng Viên & AI Ingestion), Bộ API Hiệu Đính Sư Phạm & Xóa Bỏ 100% Hardcode
+
+- **Xóa Bỏ Toàn Bộ Hardcode C# & Dữ Liệu Tĩnh Trong Mã Nguồn**:
+  - Loại bỏ hoàn toàn `CurriculumHierarchySeeder.cs` và các switch-case hardcode LaTeX/câu hỏi giả trong `GetCurriculumTreeQuery.cs`.
+  - Toàn bộ dữ liệu được truy vấn 100% động từ cơ sở dữ liệu PostgreSQL (`v_eval_content`), sử dụng quan hệ điều hướng EF Core và biểu thức chính quy (Regex) trích xuất công thức KaTeX từ văn bản thực tế.
+- **Triển Khai REST API Nhập Liệu Tri Thức Động (`POST /api/content/curriculum/import`)**:
+  - Hỗ trợ kiến trúc 2 kênh bổ trợ lẫn nhau: Giảng viên/Ban Chuyên Môn chủ động quản lý nhập liệu và AI Engine tự động nạp phân tích từ file PDF Sách Giáo Khoa.
+  - Triển khai `ImportCurriculumCommand` và `ImportCurriculumCommandHandler`: Tự động upsert toàn bộ cây phân cấp đa môn: `Miền Năng Lực` -> `Chương` -> `Bài học` -> `Dạng bài` -> `Materials` -> `Questions` -> `SkillPrerequisites`.
+- **Triển Khai Trọn Bộ REST APIs Hiệu Đính Tri Thức Sư Phạm Dành Riêng Cho Giảng Viên**:
+  - **`PUT /api/content/curriculum/patterns/{id}` (`UpdatePatternCommand`)**: Cho phép giảng viên hiệu đính toàn bộ 4 khối nội dung của dạng bài: Tên dạng, trọng số, Khối 1 (Nền tảng SGK), Khối 2 (Phương pháp giải KaTeX từng bước), Khối 3 (Video URL & thời lượng), Khối 4 (Câu hỏi mẫu minh họa, 4 phương án, đáp án đúng & lời giải chi tiết).
+  - **`PUT /api/content/curriculum/nodes/{id}` (`UpdateNodeCommand`)**: Giảng viên cập nhật tên, mô tả hoặc thứ bậc của Chương / Bài học.
+  - **`POST /api/content/curriculum/nodes` (`CreateNodeCommand`)**: Cho phép giảng viên chủ động thêm mới Chương, Bài học hoặc Dạng bài vào Cây tri thức.
+  - **`DELETE /api/content/curriculum/nodes/{id}` (`DeleteNodeCommand`)**: Xóa an toàn Chương, Bài học hoặc Dạng bài thừa, tự động dọn dẹp quan hệ tiên quyết DAG, tài liệu và câu hỏi liên quan.
+- **Cấu Trúc Cây 3 Tầng Chuẩn Sư Phạm SGK Cho Mọi Môn Học**:
+  - Trả về cấu trúc cây 3 tầng động chuẩn mực (`Chapters` -> `Lessons` -> `Patterns`) qua API `GET /api/content/curriculum`.
+- **Biên Dịch & Kiểm Thử Vận Hành**:
+  - `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error** trên .NET 9 SDK).
+
+---
+
+## [14/10/2026] - Triển Khai REST API Dàn Kiến Thức & Khung Tri Thức Động (Curriculum & Knowledge Tree API)
+
+- **Triển Khai REST API Dàn Kiến Thức (`GET /api/content/curriculum`)**:
+  - Xây dựng `CurriculumController.cs` tiếp nhận truy vấn dàn kiến thức chuẩn ĐHQG-HCM từ Web Client qua Gateway.
+  - Xây dựng `GetCurriculumTreeQuery.cs` và `GetCurriculumTreeQueryHandler.cs` trong tầng Application: Truy vấn trực tiếp từ cơ sở dữ liệu `CompetencyDomains`, `Skills`, `Materials`, `Questions` và `SkillPrerequisites`.
+  - Loại bỏ hoàn toàn việc hardcode danh mục trên Frontend: Cung cấp đầy đủ cấu trúc 4 miền, 12 kỹ năng chuẩn, trọng số, chuẩn Bloom, công thức KaTeX và mô hình liên môn GraphRAG.
+- **Biên Dịch & Kiểm Thử Vận Hành**:
+  - `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error** trên .NET 9).
+  - Kiểm thử trực tiếp qua Gateway `GET http://localhost:5212/api/content/curriculum` trả về 200 OK với đầy đủ 4 miền năng lực và 12 kỹ năng.
+
+---
+
+## [13/10/2026] - Triển Khai Hoàn Thiện Ngân Hàng Câu Hỏi Gốc (APIs 16 - 18) & Bộ Đề Quiz Thích Ứng (API 19)
+
+- **Triển Khai Bộ 3 REST APIs Quản Trị Ngân Hàng Câu Hỏi Gốc (`QuestionsController.cs`)**:
+  - **API 16 (`POST /api/content/questions`)**: Triển khai `CreateQuestionCommand`, Validator và Handler. Tiếp nhận công thức LaTeX stem (`ContentLatex`), 4 đáp án A-D, phương án đúng `CorrectOption`, phân loại Bloom 6 cấp độ (`DifficultyLevel` 1-6) và lời giải chi tiết `Explanation`. Trả về `201 Created` kèm Location header.
+  - **API 17 (`PUT /api/content/questions/{id}`)**: Triển khai `UpdateQuestionCommand`, Validator và Handler. Hiệu đính nội dung, đáp án, cấp độ Bloom, giải thích và liên kết bài đọc hiểu `PassageId`.
+  - **API 18 (`DELETE /api/content/questions/{id}`)**: Triển khai `DeleteQuestionCommand` và Handler. Xóa an toàn câu hỏi và tự động dọn dẹp các liên kết trong `exam_questions`.
+  - **API Tra Cứu Câu Hỏi**:
+    - `GET /api/content/questions/{id}`: Tra cứu chi tiết một câu hỏi kèm thông tin Kỹ năng và Miền năng lực liên kết.
+    - `GET /api/content/questions/by-skill/{skillId}`: Tra cứu danh sách câu hỏi theo kỹ năng chuẩn và lọc theo cấp độ nhận thức Bloom (`bloomLevel`).
+- **Triển Khai API 19: Đóng Gói Bộ Đề Quiz Thích Ứng (`POST /api/content/exams/quiz`)**:
+  - Triển khai `CreateQuizExamCommand`, Validator và Handler trong `MockExamsController.cs`.
+  - Thuật toán trích xuất thích ứng:
+    - Tiếp nhận danh sách `SkillIds` (hoặc `CommonWeakSkillIds` từ phân nhóm vi mô Practice Service).
+    - Lọc câu hỏi trong ngân hàng đề theo dải độ khó Bloom (mặc định Bloom 1-3: Nhận biết, Thông hiểu, Vận dụng).
+    - Tự động xáo trộn và bốc đủ số lượng `QuestionCount` (5-10 câu), tạo bản ghi `MockExam` loại `QUIZ`, gắn thứ tự `QuestionOrder` trong `ExamQuestions`.
+    - Trả về `QuizExamResponseDto` với `ExamId` (dùng làm `WorksheetId`), `Title` (dùng làm `WorksheetTitle`) và danh sách câu hỏi.
+- **Biên Dịch & Kiểm Thử**:
+  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error**).
+
+---
+
+## [12/10/2026] - Nghiệm Thu Kiến Trúc Ngân Hàng Câu Hỏi & Đóng Gói Đề Quiz Thích Ứng (APIs 16 - 19)
+
+- **Nghiệm Thu Kiến Trúc Liên Thông Micro-Grouping (Practice Service <-> Content Service)**:
+  - Thấu hiểu cơ chế tiếp nhận danh sách `CommonWeakSkillIds` từ thuật toán phân cụm vi mô `ClassMicroClusterer` bên Practice Service.
+  - Phân tích ranh giới dữ liệu: `Practice Service` quản lý trạm bàn học và lớp học offline trần 20 học sinh, `Content Service` là Single Source of Truth cho toàn bộ câu hỏi, công thức LaTeX, cấp độ Bloom 1-6 và lời giải chi tiết.
+- **Đặc Tả Kỹ Thuật Chi Tiết Bộ 4 REST APIs Core Flow 2 (Assignee: ThinhTT)**:
+  - **API 16: `POST /api/content/questions`**: Thêm câu hỏi vào ngân hàng đề gốc với nội dung LaTeX bảo toàn, 4 đáp án (1 đáp án đúng), độ khó IRT `[-3.0, +3.0]`, cấp độ Bloom và lời giải chi tiết.
+  - **API 17: `PUT /api/content/questions/{id}`**: Hiệu đính nội dung, đáp án, độ khó, cấp độ nhận thức Bloom và giải thích.
+  - **API 18: `DELETE /api/content/questions/{id}`**: Xóa mềm / vô hiệu hóa câu hỏi sai sót trong ngân hàng đề.
+  - **API 19: `POST /api/content/exams/quiz`**: Đóng gói đề Quiz củng cố 5-10 câu hỏi chuẩn Bloom từ `CommonWeakSkillIds`, tạo bản ghi `MockExam` tự động trả về `worksheetId` và `worksheetTitle` cho Practice Service gán bài tập.
+- **Khởi Tạo Nhánh Tính Năng Mới**:
+  - Khởi tạo nhánh `ThinhTT/feature-question-bank-adaptive-quiz` từ `develop` để tiến hành lập trình khép kín bộ 4 APIs.
+- **Trạng Thái Kiểm Thử**:
+  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error**).
+
+---
+
 ## [07/10/2026] - Chuẩn Hóa Khung Cấu Hình gRPC Kestrel & Kết Nối CSDL Tập Trung
 - **Chuẩn Hóa File Cấu Hình Mẫu (`appsettings.example.json`)**:
   - Bổ sung cấu hình `Kestrel` hỗ trợ giao thức Http1AndHttp2 cho gRPC Server port `:5250`.
