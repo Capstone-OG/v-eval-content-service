@@ -1,9 +1,13 @@
-# Nhật Ký Cập Nhật (Update Log) - Content Service
+# NHẬT KÝ CẬP NHẬT (UPDATE LOG) - CONTENT SERVICE
 
-## [23/10/2026] - Đồng Bộ CSDL Khung Năng Lực & Đề Thi Chuẩn Vào Master SQL.sql Và Capstone.drawio
+## [27/10/2026] - Khởi Tạo Bộ Unit Test Cho FluentValidation Command Đề Thi Và Tích Hợp CI Test
 
-- **Đồng Bộ CSDL Phân Hệ Content (`v_eval_content`)**:
-  - Hợp nhất toàn bộ 8 bảng thực thể vào `docs/SQL/SQL.sql`: `CompetencyDomains`, `Skills`, `SkillPrerequisites` (DAG), `Materials`, `Passages`, `Questions`, `MockExams`, `ExamQuestions`.
-  - Chuẩn hóa đầy đủ các trường phân loại đề thi (`exam_category`, `subject_code`, `difficulty_level`), độ dài video học liệu `duration_seconds` và các ràng buộc đồ thị tiên quyết.
-- **Đồng Bộ ERD Trang 1 Trong `docs/SQL/Capstone.drawio`**:
-  - Phân bổ vào 2 package: `3. Khung năng lực & Ngân hàng câu hỏi` (6 bảng) và `4. Thi thử & Giám sát liêm chính` (liên kết đề thi - câu hỏi).
+- **Khởi Tạo Dự Án Kiểm Thử `V-Eval-Content_Service.Tests` (3 Tests)**:
+  - Thiết lập dự án kiểm thử theo chuẩn xUnit và .NET 9, liên kết với `V-Eval-Content_Service.Application`.
+  - Triển khai bộ 3 unit test cho trình xác thực nghiệp vụ [`CreateQuizExamCommandValidatorTests.cs`](./V-Eval-Content_Service.Tests/Features/Exams/Commands/CreateQuizExamCommandValidatorTests.cs):
+    - Kiểm thử khi dữ liệu hợp lệ (Title, Duration, MinPassingScore) -> Validator trả về `IsValid == true`.
+    - Kiểm thử khi thiếu tiêu đề (Title rỗng) -> Bắt lỗi Validation đúng quy tắc.
+    - Kiểm thử khi thời lượng hoặc điểm qua môn không hợp lệ (Duration <= 0, MinPassingScore < 0) -> Bắt lỗi chính xác.
+  - Tích hợp project vào `V-Eval-Content_Service.sln`.
+- **Tích Hợp Tự Động Hóa CI/CD Workflow**:
+  - Bổ sung bước thực thi `dotnet test --no-build --configuration Release --verbosity normal` vào `.github/workflows/ci.yml`.
