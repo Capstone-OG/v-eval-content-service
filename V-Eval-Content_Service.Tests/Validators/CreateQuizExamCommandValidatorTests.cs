@@ -14,13 +14,13 @@ public class CreateQuizExamCommandValidatorTests
     public void Validate_WhenCommandIsValid_ShouldNotHaveAnyErrors()
     {
         // Arrange
-        var command = new CreateQuizExamCommand
-        {
-            SkillIds = new List<Guid> { Guid.NewGuid() },
-            QuestionCount = 10,
-            MinBloomLevel = 1,
-            MaxBloomLevel = 4
-        };
+        var command = new CreateQuizExamCommand(
+            Title: "Kiểm tra kiến thức Hàm số",
+            SkillIds: new List<Guid> { Guid.NewGuid() },
+            QuestionCount: 10,
+            MinBloomLevel: 1,
+            MaxBloomLevel: 4
+        );
 
         // Act
         var result = _validator.TestValidate(command);
@@ -33,13 +33,13 @@ public class CreateQuizExamCommandValidatorTests
     public void Validate_WhenSkillIdsIsEmpty_ShouldHaveValidationError()
     {
         // Arrange
-        var command = new CreateQuizExamCommand
-        {
-            SkillIds = new List<Guid>(),
-            QuestionCount = 10,
-            MinBloomLevel = 1,
-            MaxBloomLevel = 3
-        };
+        var command = new CreateQuizExamCommand(
+            Title: "Đề thi rỗng kỹ năng",
+            SkillIds: new List<Guid>(),
+            QuestionCount: 10,
+            MinBloomLevel: 1,
+            MaxBloomLevel: 3
+        );
 
         // Act
         var result = _validator.TestValidate(command);
@@ -52,13 +52,13 @@ public class CreateQuizExamCommandValidatorTests
     public void Validate_WhenMaxBloomIsLessThanMinBloom_ShouldHaveValidationError()
     {
         // Arrange
-        var command = new CreateQuizExamCommand
-        {
-            SkillIds = new List<Guid> { Guid.NewGuid() },
-            QuestionCount = 5,
-            MinBloomLevel = 4,
-            MaxBloomLevel = 2 // Sai logic: Max < Min
-        };
+        var command = new CreateQuizExamCommand(
+            Title: "Đề thi sai Bloom",
+            SkillIds: new List<Guid> { Guid.NewGuid() },
+            QuestionCount: 5,
+            MinBloomLevel: 4,
+            MaxBloomLevel: 2 // Sai logic: Max < Min
+        );
 
         // Act
         var result = _validator.TestValidate(command);
