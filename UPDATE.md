@@ -8,6 +8,6 @@
     - Kiểm thử khi dữ liệu hợp lệ (Title, Duration, MinPassingScore) -> Validator trả về `IsValid == true`.
     - Kiểm thử khi thiếu tiêu đề (Title rỗng) -> Bắt lỗi Validation đúng quy tắc.
     - Kiểm thử khi thời lượng hoặc điểm qua môn không hợp lệ (Duration <= 0, MinPassingScore < 0) -> Bắt lỗi chính xác.
-  - Tích hợp project vào `V-Eval-Content_Service.sln`.
+  - Đồng bộ phiên bản `FluentValidation` lên `12.1.1` khớp với `Application` dependency, triệt tiêu lỗi cảnh báo downgrade package `NU1605`.
 - **Tích Hợp Tự Động Hóa CI/CD Workflow**:
   - Bổ sung bước thực thi `dotnet test --no-build --configuration Release --verbosity normal` vào `.github/workflows/ci.yml`.
