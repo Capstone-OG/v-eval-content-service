@@ -1,5 +1,6 @@
 using FluentValidation;
 using MediatR;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using V_Eval_Content_Service.API.Middlewares;
@@ -14,11 +15,19 @@ using V_Eval_Content_Service.Application.Common.Converters;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Cấu hình Kestrel: Cổng 5249 cho REST/Swagger (HTTP/1), Cổng 5250 cho gRPC Server (HTTP/2)
+// Cấu hình Kestrel: Cổng 5249 cho REST/Swagger (HTTP/1), Cổng 5250 cho gRPC Server (HTTP/2), Body size tối đa 250 MB
 builder.WebHost.ConfigureKestrel(options =>
 {
+    options.Limits.MaxRequestBodySize = 262_144_000; // 250 MB
     options.ListenLocalhost(5249, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
     options.ListenLocalhost(5250, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+});
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartBodyLengthLimit = 262_144_000; // 250 MB
+    options.MultipartHeadersLengthLimit = int.MaxValue;
 });
 
 // 1. Đăng ký Controllers & API Explorer kèm JsonConverters linh hoạt cho mọi dạng dữ liệu AI / Giảng viên

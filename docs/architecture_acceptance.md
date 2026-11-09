@@ -168,5 +168,17 @@ To avoid architectural ambiguity, the system establishes a clear dual ingestion 
 - **Zero-Downtime Verification**:
   - Verified against PostgreSQL Supabase test instances; returned 200 OK with clean database state.
 
+---
+
+## 11. [09/11/2026] HIGH-THROUGHPUT PAYLOAD STREAMING (250 MB KESTREL & FORM-OPTIONS)
+- **Problem Statement**:
+  - Deep-learning OCR output, multi-chapter textbook curricula ingestion payloads, and comprehensive mock exam suites can easily exceed ASP.NET Core Kestrel's 30MB default limit, causing connection drops or HTTP 413.
+- **Architectural Solution**:
+  - Enforced `KestrelServerLimits.MaxRequestBodySize = 262_144_000` (250 MB) in `Program.cs`.
+  - Configured `FormOptions.MultipartBodyLengthLimit = 262_144_000` (250 MB) and `FormOptions.ValueLengthLimit = int.MaxValue`.
+- **Verification**:
+  - Clean compilation (`0 Warning(s), 0 Error(s)`). High-throughput payloads flow unhindered across Content Service.
+
+
 
 

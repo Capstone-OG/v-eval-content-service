@@ -1,5 +1,15 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [09/11/2026] - Nâng Giới Hạn Tải Tệp Kestrel Server & FormOptions Lên 250 MB
+
+- **Cấu Hình Giới Hạn Tải Tệp Kestrel & FormOptions (`Program.cs`)**:
+  - Bổ sung cấu hình `options.Limits.MaxRequestBodySize = 262_144_000` (250 MB) và `builder.Services.Configure<FormOptions>` với `MultipartBodyLengthLimit = 262_144_000` (250 MB).
+  - Đảm bảo các gói dữ liệu bóc tách đề thi lớn, cây khung chương trình đào tạo đồ sộ và tệp tài liệu số từ AI Engine / Web Client nạp vào Content Service không bị Kestrel ngắt ngang với lỗi 413.
+- **Biên Dịch & Kiểm Thử**:
+  - Biên dịch giải pháp `V-Eval-Content_Service.sln` đạt kết quả sạch `0 Warning, 0 Error`.
+
+---
+
 ## [02/11/2026] - Thiết Lập Kiến Trúc Test Nền Tảng Cho CONTENT SERVICE
 
 - **Chuẩn Hóa Hạ Tầng Dự Án Kiểm Thử (V-Eval-Content_Service.Tests)**:
