@@ -179,6 +179,27 @@ To avoid architectural ambiguity, the system establishes a clear dual ingestion 
 - **Verification**:
   - Clean compilation (`0 Warning(s), 0 Error(s)`). High-throughput payloads flow unhindered across Content Service.
 
+---
+
+## 12. [10/11/2026] CASCADE COMPETENCY DOMAIN DELETION & CANONICAL DOMAIN PRESERVATION ARCHITECTURE
+- **Architectural Rationale**:
+  - **Unintended Domain Sprawl**: During automated AI curriculum extraction, if an LLM hallucinates an unexpected domain or the user imports exploratory content, rogue competency domains (e.g. "Quan hệ song song trong không gian") could be created in the database.
+  - Previous `DeleteNodeCommand` only searched `_context.Skills`, rejecting domain-level deletion requests and leaving rogue domains permanently in the database.
+  - Furthermore, `ImportCurriculumCommand` previously allowed AI imports to overwrite existing domain names with whatever title the AI generated.
+- **Architectural Solution**:
+  - **Polymorphic Domain Deletion (`DeleteNodeCommand.cs`)**:
+    - Extends `DeleteNodeCommand` to identify domain identifiers prefixed with `domain-` (e.g. `domain-{domainId}`) or valid domain GUIDs directly.
+    - Queries `_context.CompetencyDomains` and executes an atomic cascading delete:
+      1. Resolves all child skills belonging to the domain.
+      2. Cascades deletion to DAG prerequisites (`SkillPrerequisites`), learning materials (`Materials`), and questions (`Questions`).
+      3. Removes all child skill entities (`Skills`).
+      4. Removes the `CompetencyDomain` entity itself from schema `content`.
+  - **Canonical Domain Protection (`ImportCurriculumCommand.cs`)**:
+    - In `ImportCurriculumCommandHandler`, preserves existing domain names. If `existingDomain` is found, its title is preserved unless the domain name is currently empty or bears the temporary default placeholder `"Miền Năng Lực"`.
+- **Verification**:
+  - Clean compilation (`0 Warning(s), 0 Error(s)`) under .NET 9.0 SDK.
+  - 3/3 automated unit tests passing 100%.
+
 
 
 

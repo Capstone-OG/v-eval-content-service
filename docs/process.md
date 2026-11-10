@@ -65,5 +65,6 @@
 | 34 | **Phòng Thủ Toàn Diện Model Validation & Null-Coalescing Import DTOs** | `CurriculumDtos.cs` & `ImportCurriculumCommandHandler.cs` | 🟢 Hoàn thành | 100% | Tái cấu trúc các trường DTO sang nullable (`string?`) kết hợp chuỗi fallback an toàn cho `TheoryRecap`, `SolutionMethod`, `PatternName`, triệt tiêu 100% lỗi HTTP 400 Bad Request |
 | 35 | **Xóa Chương Tổng Hợp & Đa Hình Node ID (Synthetic Chapter Cascade)** | `CurriculumController.cs` & `DeleteNodeCommand.cs` | 🟢 Hoàn thành | 100% | Hỗ trợ xóa cả Guid thực tế lẫn synthetic container `chap-general-{domainId}`, cascade xóa toàn bộ flat skills và quan hệ DAG, triệt tiêu lỗi HTTP 404 Not Found |
 | 36 | **Nâng Giới Hạn Tải Tệp Kestrel & FormOptions (250 MB)** | `Program.cs` | 🟢 Hoàn thành | 100% | Mở rộng Kestrel `MaxRequestBodySize` và `MultipartBodyLengthLimit` lên 250 MB tiếp nhận trọn vẹn tệp đề thi và khung tri thức lớn |
+| 37 | **Xóa Toàn Diện Miền Năng Lực & Bảo Vệ Danh Mục Miền Chuẩn** | `DeleteNodeCommand.cs`, `ImportCurriculumCommand.cs` | 🟢 Hoàn thành | 100% | Hỗ trợ xóa toàn bộ Miền năng lực (`domain-{id}` / Guid), cascade xóa sạch các Skill, Prerequisite, Question, Material, xóa Domain entity; giữ nguyên tên miền chuẩn khi AI import |
 
 
