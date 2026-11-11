@@ -17,11 +17,12 @@ namespace V_Eval_Content_Service.Infrastructure.Persistence
         public DbSet<Question> Questions { get; set; } = null!;
         public DbSet<MockExam> MockExams { get; set; } = null!;
         public DbSet<ExamQuestion> ExamQuestions { get; set; } = null!;
+        public DbSet<SkillPrerequisite> SkillPrerequisites { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // Thiết lập Default Schema là "content"
-            modelBuilder.HasDefaultSchema("content");
+            // Thiết lập Default Schema là "v_eval_content"
+            modelBuilder.HasDefaultSchema("v_eval_content");
 
             // Cấu hình CompetencyDomain
             modelBuilder.Entity<CompetencyDomain>(entity =>
@@ -67,6 +68,7 @@ namespace V_Eval_Content_Service.Infrastructure.Persistence
                 entity.Property(e => e.Content).HasColumnName("content").IsRequired();
                 entity.Property(e => e.VideoUrl).HasColumnName("video_url");
                 entity.Property(e => e.FileUrl).HasColumnName("file_url");
+                entity.Property(e => e.DurationSeconds).HasColumnName("duration_seconds").HasDefaultValue(0);
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
 
                 entity.HasOne(d => d.Skill)
@@ -148,6 +150,25 @@ namespace V_Eval_Content_Service.Infrastructure.Persistence
                 entity.HasOne(d => d.Question)
                     .WithMany(p => p.ExamQuestions)
                     .HasForeignKey(d => d.QuestionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Cấu hình SkillPrerequisite (Quan hệ đồ thị DAG N-N)
+            modelBuilder.Entity<SkillPrerequisite>(entity =>
+            {
+                entity.ToTable("SkillPrerequisites");
+                entity.HasKey(e => new { e.SkillId, e.PrerequisiteId });
+                entity.Property(e => e.SkillId).HasColumnName("skill_id");
+                entity.Property(e => e.PrerequisiteId).HasColumnName("prerequisite_id");
+
+                entity.HasOne(d => d.Skill)
+                    .WithMany(p => p.Prerequisites)
+                    .HasForeignKey(d => d.SkillId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(d => d.PrerequisiteSkill)
+                    .WithMany(p => p.DependentSkills)
+                    .HasForeignKey(d => d.PrerequisiteId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 

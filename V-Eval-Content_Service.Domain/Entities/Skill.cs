@@ -18,5 +18,7 @@ namespace V_Eval_Content_Service.Domain.Entities
         public virtual ICollection<Skill> InverseParent { get; set; } = new List<Skill>();
         public virtual ICollection<Material> Materials { get; set; } = new List<Material>();
         public virtual ICollection<Question> Questions { get; set; } = new List<Question>();
+        public virtual ICollection<SkillPrerequisite> Prerequisites { get; set; } = new List<SkillPrerequisite>();
+        public virtual ICollection<SkillPrerequisite> DependentSkills { get; set; } = new List<SkillPrerequisite>();
     }
 }

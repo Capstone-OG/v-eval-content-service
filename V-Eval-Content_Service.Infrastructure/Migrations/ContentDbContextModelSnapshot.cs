@@ -17,7 +17,7 @@ namespace V_Eval_Content_Service.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasDefaultSchema("content")
+                .HasDefaultSchema("v_eval_content")
                 .HasAnnotation("ProductVersion", "9.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
@@ -42,7 +42,7 @@ namespace V_Eval_Content_Service.Infrastructure.Migrations
 
                     b.HasKey("DomainId");
 
-                    b.ToTable("CompetencyDomains", "content");
+                    b.ToTable("CompetencyDomains", "v_eval_content");
                 });
 
             modelBuilder.Entity("V_Eval_Content_Service.Domain.Entities.ExamQuestion", b =>
@@ -63,7 +63,7 @@ namespace V_Eval_Content_Service.Infrastructure.Migrations
 
                     b.HasIndex("QuestionId");
 
-                    b.ToTable("ExamQuestions", "content");
+                    b.ToTable("ExamQuestions", "v_eval_content");
                 });
 
             modelBuilder.Entity("V_Eval_Content_Service.Domain.Entities.Material", b =>
@@ -106,7 +106,7 @@ namespace V_Eval_Content_Service.Infrastructure.Migrations
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("Materials", "content");
+                    b.ToTable("Materials", "v_eval_content");
                 });
 
             modelBuilder.Entity("V_Eval_Content_Service.Domain.Entities.MockExam", b =>
@@ -159,7 +159,7 @@ namespace V_Eval_Content_Service.Infrastructure.Migrations
 
                     b.HasKey("ExamId");
 
-                    b.ToTable("MockExams", "content");
+                    b.ToTable("MockExams", "v_eval_content");
                 });
 
             modelBuilder.Entity("V_Eval_Content_Service.Domain.Entities.Passage", b =>
@@ -185,7 +185,7 @@ namespace V_Eval_Content_Service.Infrastructure.Migrations
 
                     b.HasKey("PassageId");
 
-                    b.ToTable("Passages", "content");
+                    b.ToTable("Passages", "v_eval_content");
                 });
 
             modelBuilder.Entity("V_Eval_Content_Service.Domain.Entities.Question", b =>
@@ -253,7 +253,7 @@ namespace V_Eval_Content_Service.Infrastructure.Migrations
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("Questions", "content");
+                    b.ToTable("Questions", "v_eval_content");
                 });
 
             modelBuilder.Entity("V_Eval_Content_Service.Domain.Entities.Skill", b =>
@@ -293,7 +293,7 @@ namespace V_Eval_Content_Service.Infrastructure.Migrations
 
                     b.HasIndex("ParentId");
 
-                    b.ToTable("Skills", "content");
+                    b.ToTable("Skills", "v_eval_content");
                 });
 
             modelBuilder.Entity("V_Eval_Content_Service.Domain.Entities.ExamQuestion", b =>

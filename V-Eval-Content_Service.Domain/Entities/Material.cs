@@ -10,6 +10,7 @@ namespace V_Eval_Content_Service.Domain.Entities
         public string Content { get; set; } = string.Empty;
         public string? VideoUrl { get; set; }
         public string? FileUrl { get; set; }
+        public int DurationSeconds { get; set; } = 0;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation Properties

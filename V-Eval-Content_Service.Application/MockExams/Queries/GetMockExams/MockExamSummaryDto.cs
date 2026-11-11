@@ -13,5 +13,6 @@ namespace V_Eval_Content_Service.Application.MockExams.Queries.GetMockExams
         public string? SubjectCode { get; set; }
         public int? DifficultyLevel { get; set; }
         public DateTime CreatedAt { get; set; }
+        public string CreatedAtVn => CreatedAt.AddHours(7).ToString("dd/MM/yyyy HH:mm:ss");
     }
 }

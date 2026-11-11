@@ -1,6 +1,8 @@
 using MediatR;
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
+using V_Eval_Content_Service.Application.Common.Converters;
 
 namespace V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam
 {
@@ -31,6 +33,7 @@ namespace V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam
         public int PageNumber { get; set; }
         public string Content { get; set; } = string.Empty;
         public OptionsDto Options { get; set; } = new();
+        [JsonConverter(typeof(FlexibleCharJsonConverter))]
         public char CorrectOption { get; set; } = 'A';
         public string? Explanation { get; set; }
         public int DifficultyLevel { get; set; } = 2; // 1: Easy, 2: Medium, 3: Hard

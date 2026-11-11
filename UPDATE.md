@@ -1,12 +1,11 @@
-# Nhật Ký Cập Nhật (Update Log) - Content Service
+# NHẬT KÝ CẬP NHẬT (UPDATE LOG) - CONTENT SERVICE
 
-## [15/09/2026] - Dockerize Content Service & Chuẩn Hóa Docker Compose
-- **Dockerfile Multi-Stage .NET 9**:
-  - Khởi tạo `Dockerfile` chuẩn cho Content Service (`V-Eval-Content_Service.API`) với cổng `5249`.
-  - Kết nối chung mạng nội bộ `veval_network` trong `docker-compose.yml`.
+## [02/11/2026] - Chuẩn Hóa Cấu Trúc Unit Test Nền Tảng (xUnit, Moq, FluentAssertions) & Tích Hợp Script Kiểm Thử
 
-## [14/09/2026] - Chuẩn Hóa Cấu Hình Production & Git Security
-- **Khởi Tạo `appsettings.example.json`**:
-  - Tạo file cấu hình mẫu chứa `ConnectionStrings` và `JwtSettings`.
-- **Bảo Mật Git**:
-  - Cập nhật `.gitignore` ẩn các file `appsettings.json` chứa Password thật.
+- **Nâng Cấp và Chuẩn Hóa Hạ Tầng Kiểm Thử (.NET 9 SDK)**:
+  - Cập nhật file dự án kiểm thử `V-Eval-Content_Service.Tests.csproj` đồng bộ chuẩn kiến trúc OJT: `xunit 2.9.2`, `Moq 4.20.72`, `FluentAssertions 7.2.0`, `coverlet.collector 6.0.2` kết hợp `Global Usings` (`Xunit`, `Moq`, `FluentAssertions`).
+  - Khởi tạo thư mục và khôi phục công cụ đo lường độ bao phủ `.config/dotnet-tools.json` (`dotnet-reportgenerator-globaltool 5.4.18`).
+  - Thiết lập sẵn cấu trúc thư mục khung cho kiểm thử Unit Test: `Commands/`, `Queries/`, `Validators/`, `Common/`.
+  - Cập nhật `.gitignore` loại trừ thư mục kết quả test `TestResults/` và file đo lường `*.cobertura.xml`.
+- **Triển Khai Script Thực Thi Kiểm Thử Cục Bộ (`Scripts/test.bat`)**:
+  - Tạo script chạy test độc lập cho dịch vụ, tự động nhận diện SDK .NET 9 trên Host (`%USERPROFILE%\.dotnet\dotnet.exe`), chạy `dotnet test` kèm thu thập Cobertura coverage và sinh báo cáo HTML chi tiết.
