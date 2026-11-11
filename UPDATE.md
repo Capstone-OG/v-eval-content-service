@@ -1,16 +1,20 @@
 # NHẬT KÝ CẬP NHẬT (UPDATE LOG) - CONTENT SERVICE
 
-## [11/11/2026] - Nâng Cấp Khả Năng Xóa Toàn Diện Miền Năng Lực & Bảo Vệ Toàn Vẹn Danh Mục Khung Tri Thức Chuẩn V-ACT
+## [11/11/2026] - Chuyển Nhánh Main, Cấu Hình Kestrel ListenAnyIP & Đóng Gói Docker Container Cho Hệ Thống V-Eval
 
-- **Bổ Sung Tính Năng Xóa Toàn Diện Miền Năng Lực ([`DeleteNodeCommand.cs`](./V-Eval-Content_Service.Application/Curriculum/Commands/DeleteNode/DeleteNodeCommand.cs))**:
-  - Hỗ trợ cú pháp xóa toàn bộ Miền năng lực thông qua tiền tố `domain-{domainId}` hoặc trực tiếp bằng `domainGuid`.
-  - Tự động thu hồi và dọn dẹp phân cấp toàn diện: Xóa toàn bộ DAG Prerequisites, bài học, dạng bài, câu hỏi liên kết, học liệu (Materials) và xóa vĩnh viễn thực thể `CompetencyDomain` khỏi cơ sở dữ liệu.
-  - Cho phép người dùng và giảng viên một chạm xóa bỏ các miền dư thừa hoặc phân loại nhầm (như miền "Quan hệ song song trong không gian").
+- **Cấu Hình Kestrel Lắng Nghe Đa Giao Diện Mạng ([`Program.cs`](./V-Eval-Content_Service.API/Program.cs))**:
+  - Chuyển đổi từ cấu hình `options.ListenLocalhost(...)` sang `options.ListenAnyIP(...)`:
+    - Cổng `5249`: Lắng nghe HTTP/1 phục vụ toàn bộ REST API quản lý cây dàn kiến thức (`Curriculum`), ngân hàng câu hỏi (`Questions`), đề thi mô phỏng (`MockExams`) và tài liệu học tập (`Materials`).
+    - Cổng `5250`: Lắng nghe HTTP/2 phục vụ dịch vụ gRPC Server cho các microservice nội bộ kết nối trực tiếp.
+  - Thiết lập dung lượng nhận dữ liệu tối đa 250MB (`MaxRequestBodySize = 262_144_000`) hỗ trợ nạp tài liệu và giáo trình SGK dung lượng lớn.
+  - Cho phép Kestrel chấp nhận các kết nối liên container từ `veval_network` trong Docker Compose và kết nối từ bên ngoài máy chủ.
 
-- **Bảo Vệ Tính Toàn Vẹn Của Danh Mục Miền Chuẩn ([`ImportCurriculumCommand.cs`](./V-Eval-Content_Service.Application/Curriculum/Commands/ImportCurriculum/ImportCurriculumCommand.cs))**:
-  - Ngăn chặn triệt để tình trạng ghi đè tên miền hiện có bằng các tiêu đề chuyên đề hoặc nội dung do AI trích xuất (chỉ cập nhật tên khi miền vừa tạo mới hoặc đang mang tên mặc định tạm "Miền Năng Lực").
-  - Giữ vững cấu trúc 5 miền năng lực khảo thí chuẩn hóa của đề thi V-ACT (Toán học, Ngữ văn, KHTN, KHXH, Tiếng Anh).
+- **Chuẩn Hóa Đóng Gói Docker Production ([`Dockerfile`](./Dockerfile), [`docker-compose.yml`](../../docker-compose.yml))**:
+  - Cập nhật chỉ thị `EXPOSE 5249 5250` và biến môi trường `ENV ASPNETCORE_URLS=http://+:5249;http://+:5250` trong Dockerfile.
+  - Cập nhật cấu hình Docker Compose ánh xạ hai cổng `5249:5249` và `5250:5250`, đồng bộ URL gRPC với Practice Service và URL REST với Gateway cluster.
 
-- **Biên Dịch & Kiểm Thử Vận Hành**:
-  - Biên dịch toàn bộ Content Service đạt 0 lỗi (`0 Error(s)`).
-  - Toàn bộ 3/3 bài kiểm thử unit tests vượt qua thành công 100%.
+- **Kiểm Thử & Nghiệm Thu Trực Tuyến**:
+  - `dotnet build`: Biên dịch thành công 100% với .NET 9 SDK (0 Error, 0 Warning).
+  - Docker Image `capstone-v-eval-content-service:latest` build thành công trong 117.9 giây.
+  - Container `v_eval_content_service` khởi chạy ở trạng thái `Up`, phục vụ dữ liệu trực tiếp:
+    - Endpoint `https://api.pickic.io.vn/api/content/curriculum` phản hồi HTTP 200 kèm trọn bộ cây dàn kiến thức 4 miền năng lực chuẩn hóa.

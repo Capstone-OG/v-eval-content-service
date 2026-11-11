@@ -198,6 +198,22 @@ To avoid architectural ambiguity, the system establishes a clear dual ingestion 
     - In `ImportCurriculumCommandHandler`, preserves existing domain names. If `existingDomain` is found, its title is preserved unless the domain name is currently empty or bears the temporary default placeholder `"Miền Năng Lực"`.
 - **Verification**:
   - Clean compilation (`0 Warning(s), 0 Error(s)`) under .NET 9.0 SDK.
+
+---
+
+## 13. [11/11/2026] MULTI-NETWORK KESTREL BINDING & PRODUCTION DOCKER DEPLOYMENT ARCHITECTURE
+- **Architectural Rationale**:
+  - Previously, Kestrel in Content Service enforced `options.ListenLocalhost(5249)` and `options.ListenLocalhost(5250)`. While operational on the host machine, loopback binding in Docker containers rejects any incoming TCP traffic arriving from external bridges (`veval_network`) or Gateway proxies.
+- **Architectural Solution**:
+  - Replaced loopback listeners with `options.ListenAnyIP(5249)` (HTTP/1 REST) and `options.ListenAnyIP(5250)` (HTTP/2 gRPC).
+  - Preserved 250 MB `MaxRequestBodySize` and `FormOptions` limits.
+  - Aligned Dockerfile `EXPOSE 5249 5250` and `ENV ASPNETCORE_URLS=http://+:5249;http://+:5250`.
+  - Configured Docker Compose service `v_eval_content_service` ports `5249:5249` and `5250:5250` connected to bridge `capstone_veval_network`.
+- **Verification & Live Acceptance**:
+  - Compilation: 0 Warning, 0 Error on .NET 9 SDK.
+  - Docker Compose deployment: Container running in `Up` state.
+  - Public Cloudflare Gateway verification: `GET https://api.pickic.io.vn/api/content/curriculum` returns 200 OK with complete multi-domain curriculum ontology.
+
   - 3/3 automated unit tests passing 100%.
 
 

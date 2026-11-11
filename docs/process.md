@@ -66,5 +66,6 @@
 | 35 | **Xóa Chương Tổng Hợp & Đa Hình Node ID (Synthetic Chapter Cascade)** | `CurriculumController.cs` & `DeleteNodeCommand.cs` | 🟢 Hoàn thành | 100% | Hỗ trợ xóa cả Guid thực tế lẫn synthetic container `chap-general-{domainId}`, cascade xóa toàn bộ flat skills và quan hệ DAG, triệt tiêu lỗi HTTP 404 Not Found |
 | 36 | **Nâng Giới Hạn Tải Tệp Kestrel & FormOptions (250 MB)** | `Program.cs` | 🟢 Hoàn thành | 100% | Mở rộng Kestrel `MaxRequestBodySize` và `MultipartBodyLengthLimit` lên 250 MB tiếp nhận trọn vẹn tệp đề thi và khung tri thức lớn |
 | 37 | **Xóa Toàn Diện Miền Năng Lực & Bảo Vệ Danh Mục Miền Chuẩn** | `DeleteNodeCommand.cs`, `ImportCurriculumCommand.cs` | 🟢 Hoàn thành | 100% | Hỗ trợ xóa toàn bộ Miền năng lực (`domain-{id}` / Guid), cascade xóa sạch các Skill, Prerequisite, Question, Material, xóa Domain entity; giữ nguyên tên miền chuẩn khi AI import |
+| 38 | **Chuyển Toàn Bộ Nhánh Làm Việc Sang Main, Cấu Hình Kestrel ListenAnyIP & Đóng Gói Docker Container Cho Hệ Thống V-Eval** | `Program.cs`, `Dockerfile`, `docker-compose.yml` | 🟢 Hoàn thành | 100% | Cấu hình `ListenAnyIP` cho cổng REST (5249) và gRPC (5250) thay thế `ListenLocalhost`, mở cổng trong Dockerfile và ánh xạ mạng Docker Compose, biên dịch và triển khai phục vụ endpoint `https://api.pickic.io.vn/api/content/curriculum` thành công 100% |
 
 
