@@ -1,5 +1,49 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [11/11/2026] - Chuyển Toàn Bộ Nhánh Làm Việc Sang Main, Cấu Hình Kestrel ListenAnyIP & Đóng Gói Docker Container Cho Hệ Thống V-Eval
+
+- **Cấu Hình Kestrel Lắng Nghe Đa Giao Diện Mạng ([`Program.cs`](../V-Eval-Content_Service.API/Program.cs))**:
+  - Chuyển đổi từ cấu hình `options.ListenLocalhost(...)` sang `options.ListenAnyIP(...)`:
+    - Cổng `5249`: Lắng nghe HTTP/1 phục vụ toàn bộ REST API quản lý cây dàn kiến thức (`Curriculum`), ngân hàng câu hỏi (`Questions`), đề thi mô phỏng (`MockExams`) và tài liệu học tập (`Materials`).
+    - Cổng `5250`: Lắng nghe HTTP/2 phục vụ dịch vụ gRPC Server cho các microservice nội bộ kết nối trực tiếp.
+  - Thiết lập dung lượng nhận dữ liệu tối đa 250MB (`MaxRequestBodySize = 262_144_000`) hỗ trợ nạp tài liệu và giáo trình SGK dung lượng lớn.
+  - Cho phép Kestrel chấp nhận các kết nối liên container từ `veval_network` trong Docker Compose và kết nối từ bên ngoài máy chủ.
+
+- **Chuẩn Hóa Đóng Gói Docker Production ([`Dockerfile`](../Dockerfile), [`docker-compose.yml`](../../docker-compose.yml))**:
+  - Cập nhật chỉ thị `EXPOSE 5249 5250` và biến môi trường `ENV ASPNETCORE_URLS=http://+:5249;http://+:5250` trong Dockerfile.
+  - Cập nhật cấu hình Docker Compose ánh xạ hai cổng `5249:5249` và `5250:5250`, đồng bộ URL gRPC với Practice Service và URL REST với Gateway cluster.
+
+- **Kiểm Thử & Nghiệm Thu Trực Tuyến**:
+  - `dotnet build`: Biên dịch thành công 100% với .NET 9 SDK (0 Error, 0 Warning).
+  - Docker Image `capstone-v-eval-content-service:latest` build thành công trong 117.9 giây.
+  - Container `v_eval_content_service` khởi chạy ở trạng thái `Up`, phục vụ dữ liệu trực tiếp:
+    - Endpoint `https://api.pickic.io.vn/api/content/curriculum` phản hồi HTTP 200 kèm trọn bộ cây dàn kiến thức 4 miền năng lực chuẩn hóa.
+
+## [11/11/2026] - Nâng Cấp Khả Năng Xóa Toàn Diện Miền Năng Lực (Cascade Domain Deletion) & Bảo Vệ Toàn Vẹn Danh Mục Khung Tri Thức Chuẩn V-ACT
+
+- **Bổ Sung Tính Năng Xóa Toàn Diện Miền Năng Lực ([`DeleteNodeCommand.cs`](../V-Eval-Content_Service.Application/Curriculum/Commands/DeleteNode/DeleteNodeCommand.cs))**:
+  - Hỗ trợ xóa thực thể Miền Năng Lực (`CompetencyDomain`) qua tiền tố `domain-{domainId}` hoặc trực tiếp bằng `domainGuid`.
+  - Thực hiện cascade delete sạch sẽ: Xóa toàn bộ DAG Prerequisites, kỹ năng con, bài học, dạng bài, câu hỏi liên kết, học liệu (`Materials`) và bản ghi thực thể `CompetencyDomain` trong schema `content`.
+  - Cho phép người quản trị sư phạm loại bỏ nhanh các miền phân loại nhầm hoặc miền dư thừa (như "Quan hệ song song trong không gian").
+- **Bảo Vệ Tính Toàn Vẹn Của Danh Mục Miền Chuẩn ([`ImportCurriculumCommand.cs`](../V-Eval-Content_Service.Application/Curriculum/Commands/ImportCurriculum/ImportCurriculumCommand.cs))**:
+  - Ngăn chặn tình trạng AI Engine ghi đè làm biến đổi tên miền năng lực chính thức đã tồn tại trong CSDL.
+  - Chỉ cho phép cập nhật tên miền khi miền vừa được tạo mới hoặc đang mang tên mặc định tạm thời (`"Miền Năng Lực"`).
+- **Biên Dịch & Kiểm Thử Vận Hành**:
+  - Solution `V-Eval-Content_Service.sln` biên dịch sạch 100% (**0 Warning, 0 Error** trên .NET 9 SDK).
+  - Toàn bộ 3/3 bài kiểm thử unit tests vượt qua thành công 100%.
+
+---
+
+## [09/11/2026] - Nâng Giới Hạn Tải Tệp Kestrel Server & FormOptions Lên 250 MB
+
+- **Cấu Hình Giới Hạn Tải Tệp Kestrel & FormOptions (`Program.cs`)**:
+  - Bổ sung cấu hình `options.Limits.MaxRequestBodySize = 262_144_000` (250 MB) và `builder.Services.Configure<FormOptions>` với `MultipartBodyLengthLimit = 262_144_000` (250 MB).
+  - Đảm bảo các gói dữ liệu bóc tách đề thi lớn, cây khung chương trình đào tạo đồ sộ và tệp tài liệu số từ AI Engine / Web Client nạp vào Content Service không bị Kestrel ngắt ngang với lỗi 413.
+- **Biên Dịch & Kiểm Thử**:
+  - Biên dịch giải pháp `V-Eval-Content_Service.sln` đạt kết quả sạch `0 Warning, 0 Error`.
+
+---
+
 ## [02/11/2026] - Thiết Lập Kiến Trúc Test Nền Tảng Cho CONTENT SERVICE
 
 - **Chuẩn Hóa Hạ Tầng Dự Án Kiểm Thử (V-Eval-Content_Service.Tests)**:
@@ -236,21 +280,21 @@
 
 ## [20/09/2026] - Chuẩn Hóa Kiến Trúc Chuyên Nghiệp (Result Pattern, ErrorType, Controllers, Swagger UI), Đề Thi Chẩn Đoán 30 Câu & gRPC Server
 - **Chuẩn Hóa Kiến Trúc Giống Identity Service (`Application Layer`)**:
-  - Triển khai **Result Pattern**: [`Error.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Application/Common/Models/Error.cs) (hỗ trợ `ErrorType` từ Validation, NotFound, Conflict, Failure, Unauthorized đến Forbidden) và [`Result.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Application/Common/Models/Result.cs).
-  - Tích hợp **FluentValidation**: Cài đặt `FluentValidation.DependencyInjectionExtensions 12.1.1`, cấu hình [`ValidationBehavior.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Application/Common/Behaviors/ValidationBehavior.cs) tự động đóng gói lỗi xác thực vào `Result<T>.Failure(errors)`.
+  - Triển khai **Result Pattern**: [`Error.cs`](../V-Eval-Content_Service.Application/Common/Models/Error.cs) (hỗ trợ `ErrorType` từ Validation, NotFound, Conflict, Failure, Unauthorized đến Forbidden) và [`Result.cs`](../V-Eval-Content_Service.Application/Common/Models/Result.cs).
+  - Tích hợp **FluentValidation**: Cài đặt `FluentValidation.DependencyInjectionExtensions 12.1.1`, cấu hình [`ValidationBehavior.cs`](../V-Eval-Content_Service.Application/Common/Behaviors/ValidationBehavior.cs) tự động đóng gói lỗi xác thực vào `Result<T>.Failure(errors)`.
 - **Triển Khai Tính Năng Đề Thi Chẩn Đoán 30 Câu (Core Flow 1 - Bước 2)**:
-  - DTO chống gian lận: [`DiagnosticExamDto.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Application/Diagnostic/DTOs/DiagnosticExamDto.cs) loại bỏ 100% `CorrectOption` và `Explanation` để bảo mật đề khi gửi về client học sinh.
-  - Query & Handler: [`GetDiagnosticTestQuery.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Application/Diagnostic/Queries/GetDiagnosticTest/GetDiagnosticTestQuery.cs) truy xuất đề chẩn đoán `DIAGNOSTIC` trong CSDL PostgreSQL Supabase.
-  - Tự động Seeding đề chẩn đoán: [`DiagnosticExamSeeder.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.Infrastructure/Persistence/Seeds/DiagnosticExamSeeder.cs) tự động tạo đề chẩn đoán 30 câu chuẩn mẫu nếu CSDL chưa có.
+  - DTO chống gian lận: [`DiagnosticExamDto.cs`](../V-Eval-Content_Service.Application/Diagnostic/DTOs/DiagnosticExamDto.cs) loại bỏ 100% `CorrectOption` và `Explanation` để bảo mật đề khi gửi về client học sinh.
+  - Query & Handler: [`GetDiagnosticTestQuery.cs`](../V-Eval-Content_Service.Application/Diagnostic/Queries/GetDiagnosticTest/GetDiagnosticTestQuery.cs) truy xuất đề chẩn đoán `DIAGNOSTIC` trong CSDL PostgreSQL Supabase.
+  - Tự động Seeding đề chẩn đoán: [`DiagnosticExamSeeder.cs`](../V-Eval-Content_Service.Infrastructure/Persistence/Seeds/DiagnosticExamSeeder.cs) tự động tạo đề chẩn đoán 30 câu chuẩn mẫu nếu CSDL chưa có.
 - **Tầng API & Controller Chuẩn Hóa (`API Layer`)**:
-  - [`ApiControllerBase.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.API/Controllers/Base/ApiControllerBase.cs): Kế thừa `ControllerBase`, tự động map `Result<T>` và `ErrorType` sang mã HTTP (400, 404, 409...) kèm format JSON báo lỗi chi tiết.
-  - [`DiagnosticController.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.API/Controllers/DiagnosticController.cs): Cung cấp endpoint `GET /api/v1/content/diagnostic-test`.
-  - [`MockExamsController.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.API/Controllers/MockExamsController.cs): Chuyển đổi toàn bộ Minimal APIs cũ sang Controller chuẩn RESTful.
-  - [`GlobalExceptionHandlerMiddleware.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.API/Middlewares/GlobalExceptionHandlerMiddleware.cs): Bắt ngoại lệ 500 toàn cục.
+  - [`ApiControllerBase.cs`](../V-Eval-Content_Service.API/Controllers/Base/ApiControllerBase.cs): Kế thừa `ControllerBase`, tự động map `Result<T>` và `ErrorType` sang mã HTTP (400, 404, 409...) kèm format JSON báo lỗi chi tiết.
+  - [`DiagnosticController.cs`](../V-Eval-Content_Service.API/Controllers/DiagnosticController.cs): Cung cấp endpoint `GET /api/v1/content/diagnostic-test`.
+  - [`MockExamsController.cs`](../V-Eval-Content_Service.API/Controllers/MockExamsController.cs): Chuyển đổi toàn bộ Minimal APIs cũ sang Controller chuẩn RESTful.
+  - [`GlobalExceptionHandlerMiddleware.cs`](../V-Eval-Content_Service.API/Middlewares/GlobalExceptionHandlerMiddleware.cs): Bắt ngoại lệ 500 toàn cục.
   - Tích hợp **Swagger UI**: Cài đặt `Swashbuckle.AspNetCore 7.3.1`, hiển thị Swagger UI chuyên nghiệp tại `http://localhost:5249/swagger`.
 - **Liên Dịch Vụ gRPC (Chấm Điểm Bài Nộp Học Sinh)**:
-  - Bổ sung RPC `GetExamAnswerKey` trong [`content.proto`](file:///d:/Capstone/grpc/content.proto).
-  - Triển khai [`ContentGrpcService.cs`](file:///d:/Capstone/All%20Services/V-Eval-Content_Service/V-Eval-Content_Service.API/Services/ContentGrpcService.cs) cung cấp đáp án an toàn server-to-server cho `Practice_Service`.
+  - Bổ sung RPC `GetExamAnswerKey` trong [`content.proto`](../V-Eval-Content_Service.API/Protos/content.proto).
+  - Triển khai [`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs) cung cấp đáp án an toàn server-to-server cho `Practice_Service`.
 - **Kiểm Thử**:
   - `dotnet build` Solution thành công: **0 Warning, 0 Error**.
   - Gọi test `GET /api/v1/content/diagnostic-test` thành công trả về 30 câu hỏi sạch, không lộ đáp án.

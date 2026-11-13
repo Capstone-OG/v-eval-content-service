@@ -1,11 +1,20 @@
 # NHẬT KÝ CẬP NHẬT (UPDATE LOG) - CONTENT SERVICE
 
-## [02/11/2026] - Chuẩn Hóa Cấu Trúc Unit Test Nền Tảng (xUnit, Moq, FluentAssertions) & Tích Hợp Script Kiểm Thử
+## [11/11/2026] - Chuyển Nhánh Main, Cấu Hình Kestrel ListenAnyIP & Đóng Gói Docker Container Cho Hệ Thống V-Eval
 
-- **Nâng Cấp và Chuẩn Hóa Hạ Tầng Kiểm Thử (.NET 9 SDK)**:
-  - Cập nhật file dự án kiểm thử `V-Eval-Content_Service.Tests.csproj` đồng bộ chuẩn kiến trúc OJT: `xunit 2.9.2`, `Moq 4.20.72`, `FluentAssertions 7.2.0`, `coverlet.collector 6.0.2` kết hợp `Global Usings` (`Xunit`, `Moq`, `FluentAssertions`).
-  - Khởi tạo thư mục và khôi phục công cụ đo lường độ bao phủ `.config/dotnet-tools.json` (`dotnet-reportgenerator-globaltool 5.4.18`).
-  - Thiết lập sẵn cấu trúc thư mục khung cho kiểm thử Unit Test: `Commands/`, `Queries/`, `Validators/`, `Common/`.
-  - Cập nhật `.gitignore` loại trừ thư mục kết quả test `TestResults/` và file đo lường `*.cobertura.xml`.
-- **Triển Khai Script Thực Thi Kiểm Thử Cục Bộ (`Scripts/test.bat`)**:
-  - Tạo script chạy test độc lập cho dịch vụ, tự động nhận diện SDK .NET 9 trên Host (`%USERPROFILE%\.dotnet\dotnet.exe`), chạy `dotnet test` kèm thu thập Cobertura coverage và sinh báo cáo HTML chi tiết.
+- **Cấu Hình Kestrel Lắng Nghe Đa Giao Diện Mạng ([`Program.cs`](./V-Eval-Content_Service.API/Program.cs))**:
+  - Chuyển đổi từ cấu hình `options.ListenLocalhost(...)` sang `options.ListenAnyIP(...)`:
+    - Cổng `5249`: Lắng nghe HTTP/1 phục vụ toàn bộ REST API quản lý cây dàn kiến thức (`Curriculum`), ngân hàng câu hỏi (`Questions`), đề thi mô phỏng (`MockExams`) và tài liệu học tập (`Materials`).
+    - Cổng `5250`: Lắng nghe HTTP/2 phục vụ dịch vụ gRPC Server cho các microservice nội bộ kết nối trực tiếp.
+  - Thiết lập dung lượng nhận dữ liệu tối đa 250MB (`MaxRequestBodySize = 262_144_000`) hỗ trợ nạp tài liệu và giáo trình SGK dung lượng lớn.
+  - Cho phép Kestrel chấp nhận các kết nối liên container từ `veval_network` trong Docker Compose và kết nối từ bên ngoài máy chủ.
+
+- **Chuẩn Hóa Đóng Gói Docker Production ([`Dockerfile`](./Dockerfile), [`docker-compose.yml`](../../docker-compose.yml))**:
+  - Cập nhật chỉ thị `EXPOSE 5249 5250` và biến môi trường `ENV ASPNETCORE_URLS=http://+:5249;http://+:5250` trong Dockerfile.
+  - Cập nhật cấu hình Docker Compose ánh xạ hai cổng `5249:5249` và `5250:5250`, đồng bộ URL gRPC với Practice Service và URL REST với Gateway cluster.
+
+- **Kiểm Thử & Nghiệm Thu Trực Tuyến**:
+  - `dotnet build`: Biên dịch thành công 100% với .NET 9 SDK (0 Error, 0 Warning).
+  - Docker Image `capstone-v-eval-content-service:latest` build thành công trong 117.9 giây.
+  - Container `v_eval_content_service` khởi chạy ở trạng thái `Up`, phục vụ dữ liệu trực tiếp:
+    - Endpoint `https://api.pickic.io.vn/api/content/curriculum` phản hồi HTTP 200 kèm trọn bộ cây dàn kiến thức 4 miền năng lực chuẩn hóa.
