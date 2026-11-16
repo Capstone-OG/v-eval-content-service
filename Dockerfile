@@ -18,7 +18,7 @@ RUN dotnet publish "V-Eval-Content_Service.API.csproj" -c Release -o /app/publis
 # Stage 2: ASP.NET Core Runtime Image
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
-EXPOSE 5249
-ENV ASPNETCORE_URLS=http://+:5249
+EXPOSE 5249 5250
+ENV ASPNETCORE_URLS=http://+:5249;http://+:5250
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "V-Eval-Content_Service.API.dll"]

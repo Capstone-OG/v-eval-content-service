@@ -57,7 +57,11 @@ public class ImportCurriculumCommandHandler : IRequestHandler<ImportCurriculumCo
             }
             else
             {
-                if (!string.IsNullOrWhiteSpace(dto.DomainName)) domain.Name = dto.DomainName;
+                // Chỉ cập nhật Name nếu miền hiện tại chưa có tên hoặc là tên mặc định tạm
+                if (string.IsNullOrWhiteSpace(domain.Name) || domain.Name.Equals("Miền Năng Lực", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.IsNullOrWhiteSpace(dto.DomainName)) domain.Name = dto.DomainName;
+                }
                 if (!string.IsNullOrWhiteSpace(dto.DomainDescription)) domain.Description = dto.DomainDescription;
             }
             await _context.SaveChangesAsync(cancellationToken);

@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using V_Eval_Content_Service.Application.Common.Interfaces;
 using V_Eval_Content_Service.Application.Common.Models;
+using V_Eval_Content_Service.Domain.Entities;
 
 namespace V_Eval_Content_Service.Application.Curriculum.Commands.DeleteNode;
 
@@ -46,6 +47,8 @@ public class DeleteNodeCommandHandler : IRequestHandler<DeleteNodeCommand, Resul
             var idsToDelete = new HashSet<Guid>();
 
             // 1. Hỗ trợ nhóm chuyên đề phẳng synthetic "chap-general-{domainId}"
+            CompetencyDomain? domainToDelete = null;
+
             if (rawId.StartsWith("chap-general-", StringComparison.OrdinalIgnoreCase))
             {
                 var domainStr = rawId.Substring("chap-general-".Length);
@@ -67,9 +70,27 @@ public class DeleteNodeCommandHandler : IRequestHandler<DeleteNodeCommand, Resul
                     CollectDescendantIds(fs.SkillId, allSkills, idsToDelete);
                 }
             }
+            // 2. Hỗ trợ xóa toàn bộ Miền Năng Lực "domain-{domainId}"
+            else if (rawId.StartsWith("domain-", StringComparison.OrdinalIgnoreCase))
+            {
+                var domainStr = rawId.Substring("domain-".Length);
+                if (!Guid.TryParse(domainStr, out var domainId))
+                {
+                    return Result<bool>.Failure(
+                        Error.Validation("Curriculum.InvalidDomainId", $"Mã Miền không hợp lệ: {domainStr}"));
+                }
+
+                domainToDelete = await _context.CompetencyDomains.FindAsync(new object[] { domainId }, cancellationToken);
+                var domainSkills = allSkills.Where(s => s.DomainId == domainId).ToList();
+                foreach (var ds in domainSkills)
+                {
+                    idsToDelete.Add(ds.SkillId);
+                    CollectDescendantIds(ds.SkillId, allSkills, idsToDelete);
+                }
+            }
             else
             {
-                // 2. Node chuẩn (Guid)
+                // 3. Node chuẩn (Guid) - có thể là Skill hoặc Miền năng lực
                 if (!Guid.TryParse(rawId, out var nodeId) || nodeId == Guid.Empty)
                 {
                     return Result<bool>.Failure(
@@ -77,14 +98,29 @@ public class DeleteNodeCommandHandler : IRequestHandler<DeleteNodeCommand, Resul
                 }
 
                 var target = allSkills.FirstOrDefault(s => s.SkillId == nodeId);
-                if (target == null)
+                if (target != null)
                 {
-                    return Result<bool>.Failure(
-                        Error.NotFound("Curriculum.NodeNotFound", $"Không tìm thấy node có ID: {nodeId}"));
+                    idsToDelete.Add(nodeId);
+                    CollectDescendantIds(nodeId, allSkills, idsToDelete);
                 }
-
-                idsToDelete.Add(nodeId);
-                CollectDescendantIds(nodeId, allSkills, idsToDelete);
+                else
+                {
+                    domainToDelete = await _context.CompetencyDomains.FindAsync(new object[] { nodeId }, cancellationToken);
+                    if (domainToDelete != null)
+                    {
+                        var domainSkills = allSkills.Where(s => s.DomainId == nodeId).ToList();
+                        foreach (var ds in domainSkills)
+                        {
+                            idsToDelete.Add(ds.SkillId);
+                            CollectDescendantIds(ds.SkillId, allSkills, idsToDelete);
+                        }
+                    }
+                    else
+                    {
+                        return Result<bool>.Failure(
+                            Error.NotFound("Curriculum.NodeNotFound", $"Không tìm thấy node hoặc miền có ID: {nodeId}"));
+                    }
+                }
             }
 
             // Xóa quan hệ DAG Prerequisites
@@ -108,6 +144,12 @@ public class DeleteNodeCommandHandler : IRequestHandler<DeleteNodeCommand, Resul
             // Xóa Skills
             var skillsToDelete = allSkills.Where(s => idsToDelete.Contains(s.SkillId)).ToList();
             _context.Skills.RemoveRange(skillsToDelete);
+
+            // Xóa CompetencyDomain nếu đang thực hiện xóa Miền
+            if (domainToDelete != null)
+            {
+                _context.CompetencyDomains.Remove(domainToDelete);
+            }
 
             await _context.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Đã xóa node/nhóm {RawId} chứa {Count} nodes liên quan", rawId, idsToDelete.Count);
