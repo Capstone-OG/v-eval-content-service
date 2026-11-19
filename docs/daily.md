@@ -1,5 +1,18 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [19/11/2026] - Hỗ Trợ Đa Hình Định Danh Dạng Bài & Cơ Chế Upsert Tự Động Chống Lỗi 404 Khi Lưu Từ Studio Sư Phạm (`UpdatePatternCommand`)
+
+- **Nâng Cấp Route Đa Hình Cho API Hiệu Đính Dạng Bài ([`CurriculumController.cs`](../V-Eval-Content_Service.API/Controllers/CurriculumController.cs))**:
+  - Chuyển đổi route từ `[HttpPut("patterns/{id:guid}")]` sang `[HttpPut("patterns/{id}")]` với tham số `[FromRoute] string id`.
+  - Loại bỏ tình trạng ASP.NET Core Router từ chối request và trả về HTTP 404 (`"Không tìm thấy dữ liệu hoặc đường dẫn yêu cầu."`) khi giảng viên lưu dạng bài từ SGK Studio có mã định danh chuỗi (ví dụ: `"SGK_CHEM_G10_C1_L2_P1"`).
+- **Cơ Chế Ánh Xạ GUID Xác Định & Tự Động Upsert Thực Thể ([`UpdatePatternCommand.cs`](../V-Eval-Content_Service.Application/Curriculum/Commands/UpdatePattern/UpdatePatternCommand.cs))**:
+  - Bổ sung hàm `ParseOrCreateDeterministicGuid`: Tự động giải mã GUID chuẩn hoặc băm MD5 xác định (`VEVAL_PATTERN::{rawId}`) đối với các mã định danh chuỗi từ SGK Studio.
+  - Nếu `SkillId` chưa tồn tại trong bảng `v_eval_content."Skills"`, tự động đối chiếu theo tên dạng bài (`dto.Name`) hoặc tự động khởi tạo thực thể `Skill` mới gắn vào `CompetencyDomain` phù hợp cùng học liệu `Material` và câu hỏi mẫu `Question`, triệt tiêu hoàn toàn lỗi `Error.NotFound("Curriculum.PatternNotFound")`.
+- **Xác Thực Biên Dịch**:
+  - `dotnet build`: Biên dịch thành công 100% trên .NET 9 SDK (`0 Error`).
+
+---
+
 ## [19/11/2026] - Triệt Tiêu 100% Generic Hardcode, Cung Cấp Dữ Liệu Động CSDL & Chuẩn Hóa Thông Báo Nguồn Tri Thức Khuyết Thiếu
 
 - **Loại Bỏ Hoàn Toàn Placeholder Chuỗi Tĩnh Khỏi Backend**:

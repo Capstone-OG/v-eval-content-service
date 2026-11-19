@@ -297,6 +297,21 @@ To avoid architectural ambiguity, the system establishes a clear dual ingestion 
   - Verified clean .NET 9 compilation: 0 Errors.
   - API responses now cleanly omit placeholder sentences, enabling explicit missing-data UI fallbacks.
 
+---
+
+## 18. [19/11/2026] POLYMORPHIC PATTERN UPDATE ROUTE & AUTOMATIC SKILL UPSERT FOR STUDIO AUTHORING
+- **Architectural Rationale**:
+  - When instructors open the Pedagogical Studio from the Textbook Ingestion or Standard Textbook views (`TextbookStudioView`), patterns may carry composite textbook identifiers (e.g., `"SGK_CHEM_G10_C1_L2_P1"`) or deterministic IDs not yet persisted in `v_eval_content."Skills"`.
+  - Previously, `[HttpPut("patterns/{id:guid}")]` rejected non-GUID identifiers at the ASP.NET Core routing layer with HTTP 404, and `UpdatePatternCommandHandler` returned `Error.NotFound` when the GUID did not yet exist in `Skills`.
+- **Architectural Implementation**:
+  - **Polymorphic Controller Route ([`CurriculumController.cs`](../V-Eval-Content_Service.API/Controllers/CurriculumController.cs))**:
+    - Relaxed route constraint from `[HttpPut("patterns/{id:guid}")]` to `[HttpPut("patterns/{id}")]` accepting string identifiers.
+  - **Deterministic GUID Hashing & Auto-Upsert ([`UpdatePatternCommand.cs`](../V-Eval-Content_Service.Application/Curriculum/Commands/UpdatePattern/UpdatePatternCommand.cs))**:
+    - Added `ParseOrCreateDeterministicGuid` to parse standard GUIDs or compute a deterministic MD5-based GUID for textbook pattern keys.
+    - When `SkillId` is not found in `_context.Skills`, the handler first checks for a case-insensitive name match (`dto.Name`) and, if still absent, automatically provisions a new `Skill` record alongside its `Material` and sample `Question`.
+- **Verification**:
+  - Clean .NET 9 compilation (`0 Error(s)`).
+
 
 
 
