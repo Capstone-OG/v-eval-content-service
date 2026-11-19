@@ -104,5 +104,33 @@ namespace V_Eval_Content_Service.Application.MockExams.Queries.GetMockExamById
 
         [JsonPropertyName("images")]
         public List<string> Images { get; set; } = new();
+
+        // Thông tin phả hệ nút Khung năng lực & Khung chương trình (Domain -> Chapter -> Lesson -> Pattern)
+        [JsonPropertyName("skill_id")]
+        public Guid? SkillId { get; set; }
+
+        [JsonPropertyName("domain_id")]
+        public Guid? DomainId { get; set; }
+
+        [JsonPropertyName("domain_name")]
+        public string? DomainName { get; set; }
+
+        [JsonPropertyName("chapter_id")]
+        public Guid? ChapterId { get; set; }
+
+        [JsonPropertyName("chapter_name")]
+        public string? ChapterName { get; set; }
+
+        [JsonPropertyName("lesson_id")]
+        public Guid? LessonId { get; set; }
+
+        [JsonPropertyName("lesson_name")]
+        public string? LessonName { get; set; }
+
+        [JsonPropertyName("pattern_id")]
+        public Guid? PatternId { get; set; }
+
+        [JsonPropertyName("pattern_name")]
+        public string? PatternName { get; set; }
     }
 }

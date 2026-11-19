@@ -21,6 +21,13 @@ namespace V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam
 
         public async Task<Guid> Handle(ImportMockExamCommand request, CancellationToken cancellationToken)
         {
+            // Nạp sẵn danh sách Skills & Domains 1 lần để ánh xạ nhanh (tránh N+1 query cho đề 120 câu)
+            var existingSkills = await _context.Skills
+                .Include(s => s.Parent)
+                .ToListAsync(cancellationToken);
+            var existingDomains = await _context.CompetencyDomains
+                .ToListAsync(cancellationToken);
+
             // 1. Khởi tạo thực thể đề thi
             var mockExam = new MockExam
             {
@@ -50,7 +57,12 @@ namespace V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam
 
                 foreach (var qDto in passageDto.Questions)
                 {
-                    var skillId = await GetOrCreateSkillIdAsync(qDto.SuggestedSkillName, request.SubjectCode, cancellationToken);
+                    var skillId = await ResolveOrCreateSkillIdAsync(
+                        qDto,
+                        request.SubjectCode,
+                        existingSkills,
+                        existingDomains,
+                        cancellationToken);
 
                     var questionContent = !string.IsNullOrWhiteSpace(qDto.ImageUrl) && !qDto.Content.Contains(qDto.ImageUrl)
                         ? $"![Hình minh họa]({qDto.ImageUrl})\n\n{qDto.Content}"
@@ -86,7 +98,12 @@ namespace V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam
             // 3. Xử lý các câu hỏi đơn lẻ (SingleQuestions)
             foreach (var qDto in request.SingleQuestions)
             {
-                var skillId = await GetOrCreateSkillIdAsync(qDto.SuggestedSkillName, request.SubjectCode, cancellationToken);
+                var skillId = await ResolveOrCreateSkillIdAsync(
+                    qDto,
+                    request.SubjectCode,
+                    existingSkills,
+                    existingDomains,
+                    cancellationToken);
 
                 var questionContent = !string.IsNullOrWhiteSpace(qDto.ImageUrl) && !qDto.Content.Contains(qDto.ImageUrl)
                     ? $"![Hình minh họa]({qDto.ImageUrl})\n\n{qDto.Content}"
@@ -124,39 +141,64 @@ namespace V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam
             return mockExam.ExamId;
         }
 
-        private async Task<Guid> GetOrCreateSkillIdAsync(string? suggestedSkillName, string? subjectCode, CancellationToken cancellationToken)
+        private async Task<Guid> ResolveOrCreateSkillIdAsync(
+            QuestionDto qDto,
+            string? subjectCode,
+            List<Skill> existingSkills,
+            List<CompetencyDomain> existingDomains,
+            CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(suggestedSkillName))
+            // Tầng 1: Ưu tiên tuyệt đối SkillId chuẩn từ cây Khung chương trình nếu tồn tại trong DB
+            if (qDto.SkillId.HasValue && qDto.SkillId.Value != Guid.Empty)
             {
-                suggestedSkillName = "Tổng hợp";
-            }
-
-            // Tìm skill theo tên
-            var skill = await _context.Skills
-                .FirstOrDefaultAsync(s => s.Name.ToLower() == suggestedSkillName.Trim().ToLower(), cancellationToken);
-            if (skill != null)
-            {
-                return skill.SkillId;
-            }
-
-            // Xác định Lĩnh vực lớn dựa vào mã môn
-            string domainName = "Tổng hợp";
-            if (!string.IsNullOrWhiteSpace(subjectCode))
-            {
-                domainName = subjectCode.ToUpper() switch
+                var exactNode = existingSkills.FirstOrDefault(s => s.SkillId == qDto.SkillId.Value);
+                if (exactNode != null)
                 {
-                    "MATH" => "Toán học & Tư duy định lượng",
-                    "VIET" => "Sử dụng Ngôn ngữ Tiếng Việt",
-                    "ENGL" => "Sử dụng Ngôn ngữ Tiếng Anh",
-                    "PHYS" or "CHEM" or "BIOL" => "Tư duy Khoa học / Khoa học tự nhiên",
-                    "LOGIC" => "Tư duy Logic & Giải quyết vấn đề",
-                    _ => "Tổng hợp"
-                };
+                    return exactNode.SkillId;
+                }
             }
 
-            // Tìm hoặc tạo mới CompetencyDomain
-            var domain = await _context.CompetencyDomains
-                .FirstOrDefaultAsync(d => d.Name.ToLower() == domainName.ToLower(), cancellationToken);
+            // Tầng 2: Khớp tên nút theo thứ tự ưu tiên nút nằm trong cây (ParentId != null) trước khi khớp phẳng
+            var normalizedTarget = (qDto.SuggestedSkillName ?? string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(normalizedTarget))
+            {
+                var treeMatch = existingSkills
+                    .Where(s => s.ParentId.HasValue)
+                    .FirstOrDefault(s => string.Equals(s.Name.Trim(), normalizedTarget, StringComparison.OrdinalIgnoreCase));
+                if (treeMatch != null) return treeMatch.SkillId;
+
+                var anyExactMatch = existingSkills
+                    .FirstOrDefault(s => string.Equals(s.Name.Trim(), normalizedTarget, StringComparison.OrdinalIgnoreCase));
+                if (anyExactMatch != null) return anyExactMatch.SkillId;
+            }
+
+            // Tầng 2b: Khớp theo tên Bài học / Chương nếu có truyền kèm
+            if (!string.IsNullOrWhiteSpace(qDto.LessonName))
+            {
+                var lessonTarget = qDto.LessonName.Trim();
+                var lessonMatch = existingSkills
+                    .Where(s => s.ParentId.HasValue)
+                    .FirstOrDefault(s => string.Equals(s.Name.Trim(), lessonTarget, StringComparison.OrdinalIgnoreCase));
+                if (lessonMatch != null) return lessonMatch.SkillId;
+            }
+
+            if (!string.IsNullOrWhiteSpace(qDto.ChapterName))
+            {
+                var chapterTarget = qDto.ChapterName.Trim();
+                var chapterMatch = existingSkills
+                    .FirstOrDefault(s => string.Equals(s.Name.Trim(), chapterTarget, StringComparison.OrdinalIgnoreCase));
+                if (chapterMatch != null) return chapterMatch.SkillId;
+            }
+
+            // Tầng 3: Fallback an toàn (chỉ tạo Skill mới khi chưa có nút nào khớp trong cây)
+            string fallbackSkillName = string.IsNullOrWhiteSpace(normalizedTarget) ? "Tổng hợp" : normalizedTarget;
+
+            string domainName = !string.IsNullOrWhiteSpace(qDto.DomainName)
+                ? qDto.DomainName.Trim()
+                : ResolveDomainNameBySubject(subjectCode);
+
+            var domain = existingDomains
+                .FirstOrDefault(d => string.Equals(d.Name.Trim(), domainName, StringComparison.OrdinalIgnoreCase));
             if (domain == null)
             {
                 domain = new CompetencyDomain
@@ -166,21 +208,36 @@ namespace V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam
                     Description = $"Lĩnh vực năng lực {domainName}"
                 };
                 _context.CompetencyDomains.Add(domain);
+                existingDomains.Add(domain);
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
-            // Tạo mới Skill dưới Domain này
             var newSkill = new Skill
             {
                 SkillId = Guid.NewGuid(),
                 DomainId = domain.DomainId,
-                Name = suggestedSkillName.Trim(),
+                Name = fallbackSkillName,
                 CreatedAt = DateTime.UtcNow
             };
             _context.Skills.Add(newSkill);
+            existingSkills.Add(newSkill);
             await _context.SaveChangesAsync(cancellationToken);
 
             return newSkill.SkillId;
+        }
+
+        private static string ResolveDomainNameBySubject(string? subjectCode)
+        {
+            if (string.IsNullOrWhiteSpace(subjectCode)) return "Tổng hợp";
+            return subjectCode.Trim().ToUpperInvariant() switch
+            {
+                "MATH" => "Toán học & Tư duy định lượng",
+                "VIET" => "Sử dụng Ngôn ngữ Tiếng Việt",
+                "ENGL" => "Sử dụng Ngôn ngữ Tiếng Anh",
+                "PHYS" or "CHEM" or "BIOL" => "Tư duy Khoa học / Khoa học tự nhiên",
+                "LOGIC" => "Tư duy Logic & Giải quyết vấn đề",
+                _ => "Tổng hợp"
+            };
         }
     }
 }

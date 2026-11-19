@@ -1,11 +1,9 @@
-# NHẬT KÝ CẬP NHẬT (UPDATE LOG) - CONTENT SERVICE
+# UPDATE - V-Eval-Content_Service
 
-## [19/11/2026] - Đa Hình Hóa API Lưu Dạng Bài Studio (`PUT /api/content/curriculum/patterns/{id}`), Tự Động Upsert & Triệt Tiêu 100% Generic Hardcode
-
-- **Khắc Phục Triệt Để Lỗi HTTP 404 Khi Lưu Bài Giảng Từ Studio Sư Phạm (`CurriculumController.cs` & `UpdatePatternCommand.cs`)**:
-  - Mở rộng route `[HttpPut("patterns/{id}")]` tiếp nhận linh hoạt cả GUID chuẩn và mã định danh chuỗi từ SGK Studio (`SGK_...`), loại bỏ lỗi 404 từ bộ định tuyến ASP.NET Core.
-  - Bổ sung cơ chế băm GUID xác định (`ParseOrCreateDeterministicGuid`), tự động tìm khớp theo tên dạng bài hoặc khởi tạo mới (Upsert) thực thể `Skill`, `Material` và `Question` trong CSDL PostgreSQL khi dạng bài chưa tồn tại.
-- **Loại Bỏ Hoàn Toàn Placeholder Chuỗi Tĩnh Khỏi Backend (`GetCurriculumTreeQuery.cs`)**:
-  - Trả về chuỗi rỗng khi học liệu chưa có trong CSDL và ánh xạ 100% dữ liệu động từ PostgreSQL (`v_eval_content`): 139 Chương, 337 Bài học, 337 Dạng bài, 343 Học liệu KaTeX và 588 Câu hỏi.
-- **Xác Thực Biên Dịch & Vận Hành Sạch**:
-  - `dotnet build`: Succeeded 100%, 0 Error.
+## [20/11/2026]
+- **Liên Kết Trực Tiếp Câu Hỏi Đề Thi Vào Cây Node Khung Chương Trình & Truy Xuất Phả Hệ 4 Tầng (`ImportMockExamCommand.cs`, `ImportMockExamCommandHandler.cs`, `MockExamDetailDto.cs`, `GetMockExamByIdQueryHandler.cs`)**:
+  - Mở rộng `ImportMockExamCommand.QuestionDto` nhận `SkillId` (`Guid?`), `DomainName`, `ChapterName`, `LessonName`; tối ưu `ImportMockExamCommandHandler` nạp sẵn `Skills`/`Domains` 1 lần (chống N+1 query cho đề 120 câu) và gắn thẳng câu hỏi vào nút thật trên cây Khung chương trình (chấm dứt tạo Skill mồ côi).
+  - Nâng cấp `GetMockExamByIdQueryHandler` và `MockExamDetailDto` lần ngược `Skill.Parent -> Parent -> Domain` trả về trọn vẹn `skill_id`, `domain_name`, `chapter_name`, `lesson_name`, `pattern_name` cho mỗi câu hỏi khi tải đề từ Database.
+- **Bảo Vệ Khóa Ngoại Khi Xóa Đề Thi (`DeleteMockExamCommandHandler.cs`)**:
+  - Kiểm tra câu hỏi dùng chung giữa các đề (`sharedQuestionIds`) trước khi xóa `Questions` và dọn chùm đọc hiểu mồ côi, tránh lỗi khóa ngoại PostgreSQL (`23503`) khi gọi `DELETE /api/content/exams/{id}`.
+- **Kiểm Thử & Biên Dịch**: `dotnet build --no-restore` thành công (`0 Error`), `dotnet test --no-build` pass `3/3`.

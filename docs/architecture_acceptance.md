@@ -312,6 +312,25 @@ To avoid architectural ambiguity, the system establishes a clear dual ingestion 
 - **Verification**:
   - Clean .NET 9 compilation (`0 Error(s)`).
 
+---
+
+## 19. [20/11/2026] DIRECT CURRICULUM NODE BINDING FOR IMPORTED EXAMS & 4-LEVEL ANCESTOR LINEAGE HYDRATION
+- **Architectural Rationale**:
+  - Previously, importing extracted exam questions via `POST /api/content/exams/import` matched `SuggestedSkillName` using only flat name equality and created orphan root-level `Skill` entities (`ParentId = null`) outside the 4-level GDPT 2018 Curriculum Tree (`CompetencyDomain -> Chapter -> Lesson -> Pattern`).
+  - Furthermore, `GET /api/content/exams/{id}` returned only `SuggestedSkillName` without resolving the question's owning Domain, Chapter, Lesson, and Pattern hierarchy.
+- **Architectural Implementation**:
+  - **Curriculum-Aware Import Binding ([`ImportMockExamCommand.cs`](../V-Eval-Content_Service.Application/MockExams/Commands/ImportMockExam/ImportMockExamCommand.cs), [`ImportMockExamCommandHandler.cs`](../V-Eval-Content_Service.Application/MockExams/Commands/ImportMockExam/ImportMockExamCommandHandler.cs))**:
+    - Extended `QuestionDto` with nullable `SkillId`, `DomainName`, `ChapterName`, and `LessonName`.
+    - Pre-loaded `Skills` and `CompetencyDomains` once per transaction (eliminating N+1 queries on 120-question V-ACT exams) and implemented 3-tier resolution (`ResolveOrCreateSkillIdAsync`): exact `SkillId` node binding first, hierarchical tree-node (`ParentId != null`) name matching second, and safe fallback creation last.
+  - **4-Level Ancestor Traversal ([`MockExamDetailDto.cs`](../V-Eval-Content_Service.Application/MockExams/Queries/GetMockExamById/MockExamDetailDto.cs), [`GetMockExamByIdQueryHandler.cs`](../V-Eval-Content_Service.Application/MockExams/Queries/GetMockExamById/GetMockExamByIdQueryHandler.cs))**:
+    - Included `Skill.Domain` and two levels of `Skill.Parent` to project `skill_id`, `domain_id`, `domain_name`, `chapter_id`, `chapter_name`, `lesson_id`, `lesson_name`, `pattern_id`, and `pattern_name` onto every `ExamQuestionItemDto`.
+  - **Foreign-Key-Safe Exam Deletion ([`DeleteMockExamCommandHandler.cs`](../V-Eval-Content_Service.Application/MockExams/Commands/DeleteMockExam/DeleteMockExamCommandHandler.cs))**:
+    - Queries `ExamQuestions` across other exams to exclude shared `QuestionId`s before removing exclusive questions and orphan passages, preventing PostgreSQL FK constraint errors (`23503`) during `DELETE /api/content/exams/{id}`.
+- **Verification**:
+  - `dotnet build --no-restore`: Succeeded with `0 Error(s)`.
+  - `dotnet test --no-build`: `3/3` tests passed.
+
+
 
 
 

@@ -1,5 +1,20 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [20/11/2026] - Liên Kết Trực Tiếp Câu Hỏi Đề Thi Vào Cây Node Khung Chương Trình (`SkillId` Binding) & Truy Xuất Phả Hệ 4 Tầng (`Domain -> Chapter -> Lesson -> Pattern`)
+
+- **Gắn Trực Tiếp `SkillId` Của Cây Khung Chương Trình Khi Import Đề Thi ([`ImportMockExamCommand.cs`](../V-Eval-Content_Service.Application/MockExams/Commands/ImportMockExam/ImportMockExamCommand.cs), [`ImportMockExamCommandHandler.cs`](../V-Eval-Content_Service.Application/MockExams/Commands/ImportMockExam/ImportMockExamCommandHandler.cs))**:
+  - Mở rộng `QuestionDto` bổ sung các trường liên kết cây Node: `SkillId` (`Guid?`), `DomainName`, `ChapterName`, `LessonName`.
+  - Tối ưu hóa `ImportMockExamCommandHandler`: Nạp sẵn danh sách `Skills` và `CompetencyDomains` 1 lần (triệt tiêu N+1 query cho đề 120 câu); triển khai hàm `ResolveOrCreateSkillIdAsync` theo 3 tầng ưu tiên: (1) Gắn trực tiếp vào `SkillId` hợp lệ nếu đã tồn tại trên cây; (2) Ưu tiên khớp tên trên các nút thuộc cây phân cấp (`ParentId != null`: Dạng bài / Bài học / Chương) tránh tạo Skill mồ côi rác; (3) Chỉ khởi tạo Skill mới khi hoàn toàn chưa có nút phù hợp.
+- **Trả Về Phả Hệ 4 Tầng Khung Năng Lực & Khung Chương Trình Khi Tải Đề ([`MockExamDetailDto.cs`](../V-Eval-Content_Service.Application/MockExams/Queries/GetMockExamById/MockExamDetailDto.cs), [`GetMockExamByIdQueryHandler.cs`](../V-Eval-Content_Service.Application/MockExams/Queries/GetMockExamById/GetMockExamByIdQueryHandler.cs))**:
+  - Bổ sung `.Include(q => q.Skill).ThenInclude(s => s.Domain)` và `.ThenInclude(s => s.Parent).ThenInclude(p => p!.Parent)` để lần ngược chính xác 4 tầng phả hệ cho từng câu hỏi (`skill_id`, `domain_id`, `domain_name`, `chapter_id`, `chapter_name`, `lesson_id`, `lesson_name`, `pattern_id`, `pattern_name`).
+- **Bảo Vệ Khóa Ngoại Khi Xóa Đề Thi ([`DeleteMockExamCommandHandler.cs`](../V-Eval-Content_Service.Application/MockExams/Commands/DeleteMockExam/DeleteMockExamCommandHandler.cs))**:
+  - Nâng cấp `DeleteMockExamCommandHandler` kiểm tra danh sách `sharedQuestionIds` đang được đề thi khác tham chiếu trước khi xóa `Questions` và dọn dẹp `Passages` mồ côi, tránh hoàn toàn lỗi khóa ngoại PostgreSQL (`23503`) khi xóa đề thi.
+- **Xác Thực Biên Dịch & Kiểm Thử**:
+  - `dotnet build --no-restore`: Thành công 100% (`0 Error`).
+  - `dotnet test --no-build`: Pass `3/3` unit tests.
+
+---
+
 ## [19/11/2026] - Hỗ Trợ Đa Hình Định Danh Dạng Bài & Cơ Chế Upsert Tự Động Chống Lỗi 404 Khi Lưu Từ Studio Sư Phạm (`UpdatePatternCommand`)
 
 - **Nâng Cấp Route Đa Hình Cho API Hiệu Đính Dạng Bài ([`CurriculumController.cs`](../V-Eval-Content_Service.API/Controllers/CurriculumController.cs))**:

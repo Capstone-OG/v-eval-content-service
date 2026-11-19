@@ -39,6 +39,12 @@ namespace V_Eval_Content_Service.Application.MockExams.Commands.ImportMockExam
         public int DifficultyLevel { get; set; } = 2; // 1: Easy, 2: Medium, 3: Hard
         public string? SuggestedSkillName { get; set; } // Ví dụ: Cực trị hàm số
         public string? ImageUrl { get; set; }
+
+        // Liên kết trực tiếp vào cây Khung năng lực & Khung chương trình (Domain -> Chapter -> Lesson -> Pattern)
+        public Guid? SkillId { get; set; }
+        public string? DomainName { get; set; }
+        public string? ChapterName { get; set; }
+        public string? LessonName { get; set; }
     }
 
     public class OptionsDto
