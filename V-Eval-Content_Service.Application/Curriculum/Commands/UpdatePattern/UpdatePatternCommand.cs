@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
@@ -13,7 +15,28 @@ using V_Eval_Content_Service.Domain.Entities;
 
 namespace V_Eval_Content_Service.Application.Curriculum.Commands.UpdatePattern;
 
-public record UpdatePatternCommand(Guid PatternId, UpdateCurriculumPatternDto Dto) : IRequest<Result<CurriculumPatternDto>>;
+public record UpdatePatternCommand(Guid PatternId, UpdateCurriculumPatternDto Dto, string? RawPatternKey = null) : IRequest<Result<CurriculumPatternDto>>
+{
+    public UpdatePatternCommand(string rawPatternId, UpdateCurriculumPatternDto dto)
+        : this(ParseOrCreateDeterministicGuid(rawPatternId), dto, rawPatternId)
+    {
+    }
+
+    private static Guid ParseOrCreateDeterministicGuid(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return Guid.Empty;
+        }
+        var trimmed = raw.Trim();
+        if (Guid.TryParse(trimmed, out var parsed))
+        {
+            return parsed;
+        }
+        var hashBytes = MD5.HashData(Encoding.UTF8.GetBytes($"VEVAL_PATTERN::{trimmed.ToUpperInvariant()}"));
+        return new Guid(hashBytes);
+    }
+}
 
 public class UpdatePatternCommandHandler : IRequestHandler<UpdatePatternCommand, Result<CurriculumPatternDto>>
 {
@@ -47,10 +70,45 @@ public class UpdatePatternCommandHandler : IRequestHandler<UpdatePatternCommand,
             .Include(s => s.Prerequisites)
             .FirstOrDefaultAsync(s => s.SkillId == patternId, cancellationToken);
 
+        // Nếu không tìm thấy theo ID nhưng có tên dạng bài trùng khớp trong CSDL, ánh xạ sang Skill hiện có
+        if (skill == null && !string.IsNullOrWhiteSpace(dto.Name))
+        {
+            var normalizedName = dto.Name.Trim();
+            skill = await _context.Skills
+                .Include(s => s.Materials)
+                .Include(s => s.Questions)
+                .Include(s => s.Prerequisites)
+                .FirstOrDefaultAsync(s => s.Name.ToLower() == normalizedName.ToLower(), cancellationToken);
+        }
+
+        // Nếu vẫn chưa tồn tại trong bảng Skills (vd: dạng bài mới từ SGK Studio), tự động Upsert tạo mới thay vì trả lỗi 404
         if (skill == null)
         {
-            return Result<CurriculumPatternDto>.Failure(
-                Error.NotFound("Curriculum.PatternNotFound", $"Không tìm thấy dạng bài có ID: {patternId}"));
+            var defaultDomain = await _context.CompetencyDomains
+                .OrderBy(d => d.DomainId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (defaultDomain == null)
+            {
+                defaultDomain = new CompetencyDomain
+                {
+                    DomainId = Guid.Parse("6f3765db-943e-4810-bf74-d6a8bdc215da"),
+                    Name = "Toán học & Tư duy định lượng",
+                    Description = "Miền năng lực mặc định"
+                };
+                await _context.CompetencyDomains.AddAsync(defaultDomain, cancellationToken);
+            }
+
+            skill = new Skill
+            {
+                SkillId = patternId,
+                DomainId = defaultDomain.DomainId,
+                ParentId = null,
+                Name = !string.IsNullOrWhiteSpace(dto.Name) ? dto.Name.Trim() : "Dạng bài trọng tâm",
+                Weight = dto.Weight ?? 0.05,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _context.Skills.AddAsync(skill, cancellationToken);
         }
 
         try

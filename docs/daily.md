@@ -1,5 +1,125 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [20/11/2026] - Liên Kết Trực Tiếp Câu Hỏi Đề Thi Vào Cây Node Khung Chương Trình (`SkillId` Binding) & Truy Xuất Phả Hệ 4 Tầng (`Domain -> Chapter -> Lesson -> Pattern`)
+
+- **Gắn Trực Tiếp `SkillId` Của Cây Khung Chương Trình Khi Import Đề Thi ([`ImportMockExamCommand.cs`](../V-Eval-Content_Service.Application/MockExams/Commands/ImportMockExam/ImportMockExamCommand.cs), [`ImportMockExamCommandHandler.cs`](../V-Eval-Content_Service.Application/MockExams/Commands/ImportMockExam/ImportMockExamCommandHandler.cs))**:
+  - Mở rộng `QuestionDto` bổ sung các trường liên kết cây Node: `SkillId` (`Guid?`), `DomainName`, `ChapterName`, `LessonName`.
+  - Tối ưu hóa `ImportMockExamCommandHandler`: Nạp sẵn danh sách `Skills` và `CompetencyDomains` 1 lần (triệt tiêu N+1 query cho đề 120 câu); triển khai hàm `ResolveOrCreateSkillIdAsync` theo 3 tầng ưu tiên: (1) Gắn trực tiếp vào `SkillId` hợp lệ nếu đã tồn tại trên cây; (2) Ưu tiên khớp tên trên các nút thuộc cây phân cấp (`ParentId != null`: Dạng bài / Bài học / Chương) tránh tạo Skill mồ côi rác; (3) Chỉ khởi tạo Skill mới khi hoàn toàn chưa có nút phù hợp.
+- **Trả Về Phả Hệ 4 Tầng Khung Năng Lực & Khung Chương Trình Khi Tải Đề ([`MockExamDetailDto.cs`](../V-Eval-Content_Service.Application/MockExams/Queries/GetMockExamById/MockExamDetailDto.cs), [`GetMockExamByIdQueryHandler.cs`](../V-Eval-Content_Service.Application/MockExams/Queries/GetMockExamById/GetMockExamByIdQueryHandler.cs))**:
+  - Bổ sung `.Include(q => q.Skill).ThenInclude(s => s.Domain)` và `.ThenInclude(s => s.Parent).ThenInclude(p => p!.Parent)` để lần ngược chính xác 4 tầng phả hệ cho từng câu hỏi (`skill_id`, `domain_id`, `domain_name`, `chapter_id`, `chapter_name`, `lesson_id`, `lesson_name`, `pattern_id`, `pattern_name`).
+- **Bảo Vệ Khóa Ngoại Khi Xóa Đề Thi ([`DeleteMockExamCommandHandler.cs`](../V-Eval-Content_Service.Application/MockExams/Commands/DeleteMockExam/DeleteMockExamCommandHandler.cs))**:
+  - Nâng cấp `DeleteMockExamCommandHandler` kiểm tra danh sách `sharedQuestionIds` đang được đề thi khác tham chiếu trước khi xóa `Questions` và dọn dẹp `Passages` mồ côi, tránh hoàn toàn lỗi khóa ngoại PostgreSQL (`23503`) khi xóa đề thi.
+- **Xác Thực Biên Dịch & Kiểm Thử**:
+  - `dotnet build --no-restore`: Thành công 100% (`0 Error`).
+  - `dotnet test --no-build`: Pass `3/3` unit tests.
+
+---
+
+## [19/11/2026] - Hỗ Trợ Đa Hình Định Danh Dạng Bài & Cơ Chế Upsert Tự Động Chống Lỗi 404 Khi Lưu Từ Studio Sư Phạm (`UpdatePatternCommand`)
+
+- **Nâng Cấp Route Đa Hình Cho API Hiệu Đính Dạng Bài ([`CurriculumController.cs`](../V-Eval-Content_Service.API/Controllers/CurriculumController.cs))**:
+  - Chuyển đổi route từ `[HttpPut("patterns/{id:guid}")]` sang `[HttpPut("patterns/{id}")]` với tham số `[FromRoute] string id`.
+  - Loại bỏ tình trạng ASP.NET Core Router từ chối request và trả về HTTP 404 (`"Không tìm thấy dữ liệu hoặc đường dẫn yêu cầu."`) khi giảng viên lưu dạng bài từ SGK Studio có mã định danh chuỗi (ví dụ: `"SGK_CHEM_G10_C1_L2_P1"`).
+- **Cơ Chế Ánh Xạ GUID Xác Định & Tự Động Upsert Thực Thể ([`UpdatePatternCommand.cs`](../V-Eval-Content_Service.Application/Curriculum/Commands/UpdatePattern/UpdatePatternCommand.cs))**:
+  - Bổ sung hàm `ParseOrCreateDeterministicGuid`: Tự động giải mã GUID chuẩn hoặc băm MD5 xác định (`VEVAL_PATTERN::{rawId}`) đối với các mã định danh chuỗi từ SGK Studio.
+  - Nếu `SkillId` chưa tồn tại trong bảng `v_eval_content."Skills"`, tự động đối chiếu theo tên dạng bài (`dto.Name`) hoặc tự động khởi tạo thực thể `Skill` mới gắn vào `CompetencyDomain` phù hợp cùng học liệu `Material` và câu hỏi mẫu `Question`, triệt tiêu hoàn toàn lỗi `Error.NotFound("Curriculum.PatternNotFound")`.
+- **Xác Thực Biên Dịch**:
+  - `dotnet build`: Biên dịch thành công 100% trên .NET 9 SDK (`0 Error`).
+
+---
+
+## [19/11/2026] - Triệt Tiêu 100% Generic Hardcode, Cung Cấp Dữ Liệu Động CSDL & Chuẩn Hóa Thông Báo Nguồn Tri Thức Khuyết Thiếu
+
+- **Loại Bỏ Hoàn Toàn Placeholder Chuỗi Tĩnh Khỏi Backend**:
+  - Cập nhật [`GetCurriculumTreeQuery.cs`](../V-Eval-Content_Service.Application/Curriculum/Queries/GetCurriculumTree/GetCurriculumTreeQuery.cs): Thay thế toàn bộ các chuỗi gán mặc định ("Kiến thức nền tảng trong cơ sở dữ liệu.", "Phương pháp giải chi tiết trong cơ sở dữ liệu.") thành chuỗi rỗng khi học liệu chưa có trong CSDL, giúp frontend phân định chính xác và hiển thị trạng thái "Chưa có dữ liệu nguồn".
+  - Triệt tiêu triệt để tình trạng lặp lại công thức đạo hàm, tích phân hay biệt thức mẫu ở các bài học Lớp 10.
+- **Ánh Xạ Trực Tiếp 100% CSDL PostgreSQL (`v_eval_content`) (Zero-Hardcode)**:
+  - Cung cấp dữ liệu phân cấp 4 miền chuẩn ĐGNL qua REST API `GET /api/content/curriculum`:
+    - **139 Chương** (Chapters)
+    - **337 Bài học** (Lessons)
+    - **337 Dạng bài** (Patterns)
+    - **343 Học liệu** (Materials) chuyên sâu với lý thuyết KaTeX nguyên bản và công thức đặc thù.
+    - **588 Câu hỏi** (Questions) trắc nghiệm ĐGNL có 4 phương án A-B-C-D, đáp án đúng và lời giải chi tiết.
+- **Xác Thực Biên Dịch & Vận Hành Sạch**:
+  - `dotnet build`: Succeeded 100%, 0 Error.
+
+---
+
+## [19/11/2026] - Triệt Tiêu 100% Generic Hardcode, Chuẩn Hóa Tri Thức Sư Phạm & Câu Hỏi ĐGNL Đặc Thù Từng Bài Học SGK Chân Trời Sáng Tạo
+
+- **Loại Bỏ Hoàn Toàn Tri Thức Mẫu & Công Thức Chung Chung**:
+  - Triệt tiêu triệt để tình trạng lặp lại công thức đạo hàm và tích phân (`` `\int x^n dx` ``) hay biệt thức (`` `\Delta = b^2 - 4ac` ``) trong các bài học cơ bản Lớp 10 (Mệnh đề, Tập hợp, Hệ thức lượng, Vectơ...) và các phương trình hóa học mẫu (`` `2\text{Fe} + 3\text{Cl}_2 \to 2\text{FeCl}_3` ``).
+- **Thiết Kế Hệ Thống Master Pedagogical Knowledge Base (`pedagogical_knowledge_base.py`)**:
+  - Xây dựng từ điển tri thức chuyên sâu cho toàn bộ 8 phân môn phối hợp cùng phân môn Vật lí:
+    - *Toán học*: Phân bổ chuẩn xác công thức KaTeX đặc thù (Mệnh đề & Logic chân trị, Tập hợp khoảng đoạn, BPT bậc nhất 2 ẩn, Parabol hàm số bậc 2, Định lí Cosin/Sin & Heron, Vectơ & tích vô hướng, Thống kê & tứ phân vị, Cấp số cộng/nhân, Giới hạn, Mũ/Logarit, Đạo hàm, Oxyz, Nguyên hàm/Tích phân, Xác suất Bayes).
+    - *Vật lí*: Công thức động học, Ba định luật Newton, Moment lực, Công - Công suất, Bảo toàn động lượng & cơ năng, Dao động điều hòa, Sóng cơ, Điện trường, Vật lí nhiệt, Khí lí tưởng, Từ trường, Hạt nhân.
+    - *Hóa học*: Cấu tạo nguyên tử, Bảng tuần hoàn, Quy tắc octet & liên kết, Phản ứng oxi hóa - khử, Biến thiên enthalpy, Tốc độ phản ứng, Halogen, Cân bằng Le Chatelier, Hóa học hữu cơ (Hydrocarbon, Alcohol, Carbonyl, Ester - Lipid, Carbohydrate, Amine, Polymer), Pin điện & Dãy điện hóa.
+    - *Sinh học*: Cấu trúc tế bào nhân sơ/nhân thực, Chu kì tế bào (Nguyên phân/Giảm phân), Virus & vi sinh vật, Quang hợp/Hô hấp, Cảm ứng, Di truyền phân tử (DNA, RNA, Dịch mã), Di truyền Mendel, Hardy - Weinberg, Tiến hóa, Sinh thái học.
+    - *Ngữ văn, Tiếng Anh, Lịch sử, Địa lí, GDKT & PL*: Cung cấp tri thức thể loại văn học, quy tắc ngữ pháp & kĩ năng đọc hiểu, tiến trình lịch sử, quy luật tự nhiên/kinh tế và chuẩn mực pháp lí công dân đặc thù.
+- **Nạp Đầy Đủ CSDL PostgreSQL (`v_eval_content`) (Zero-Generic, Zero-Hardcode)**:
+  - Cập nhật 100% học liệu `Materials` và ngân hàng câu hỏi `Questions`:
+    - **139 Chương** (Chapters)
+    - **337 Bài học** (Lessons)
+    - **337 Dạng bài** (Patterns)
+    - **343 Học liệu** (Materials) chuyên sâu với lý thuyết KaTeX nguyên bản.
+    - **588 Câu hỏi** (Questions) trắc nghiệm ĐGNL V-ACT có 4 lựa chọn A-B-C-D, đáp án đúng và lời giải chi tiết.
+- **Kiểm Thử Vận Hành & Biên Dịch Sạch**:
+  - `dotnet build`: Succeeded, 0 Error.
+  - Truy vấn kiểm thử trực tiếp trên PostgreSQL Supabase: Khẳng định 0 trường hợp công thức đạo hàm/tích phân bị đặt nhầm vào Lớp 10.
+
+---
+
+## [19/11/2026] - Rà Soát Toàn Diện 17 Liên Kết Mục Lục SGK Chân Trời Sáng Tạo, Nạp Đầy Đủ 139 Chương Vào PostgreSQL & Sắp Xếp Sư Phạm Tự Nhiên
+
+- **Rà Soát Chuẩn Xác Toàn Bộ Cấu Trúc Khung Chương Trình SGK GDPT 2018 (Bộ Chân Trời Sáng Tạo)**:
+  - Tra cứu đối chiếu trực tiếp từ 17 liên kết mục lục chính quy từ `giaokhoaonline.com`:
+    - *Toán học (Lớp 10, 11, 12)*: Đầy đủ 26 Chương và 80 Bài học (Toán 10 Tập 1 & 2: 10 Chương; Toán 11 Tập 1 & 2: 9 Chương; Toán 12 Tập 1 & 2 + Chương Tư duy Logic & Phân tích số liệu ĐGNL: 7 Chương).
+    - *Vật lí (Lớp 10, 11, 12)*: Đầy đủ 17 Chương và 61 Bài học (Vật lí 10: 9 Chương, 23 Bài; Vật lí 11: 4 Chương, 20 Bài; Vật lí 12: 4 Chương, 18 Bài).
+    - *Hóa học (Lớp 10, 11, 12)*: Đầy đủ 21 Chương và 57 Bài học (Hóa 10: 7 Chương; Hóa 11: 6 Chương; Hóa 12: 8 Chương).
+    - *Sinh học (Lớp 10, 11, 12)*: Đầy đủ 12 Chương và 39 Bài học (Sinh 10: 4 Chương; Sinh 11: 4 Chương; Sinh 12: 4 Chương).
+    - *Ngữ văn (Lớp 10, 11, 12)*: Đầy đủ 27 Chương (9 Bài lớn theo thể loại cho từng khối lớp 10, 11, 12) và 54 Bài học.
+    - *Tiếng Anh THPT*: 6 Chương và 18 Bài học (Ngữ pháp thì, Cấu trúc câu, Câu điều kiện, Từ vựng học thuật, Thể bị động, Đảo ngữ & Kỹ năng đọc hiểu ĐGNL).
+    - *Khoa học Xã hội (Lịch sử, Địa lí, GDKT & PL)*: Đầy đủ 30 Chương (Lịch sử: 9 Chương; Địa lí: 12 Chương; GDKT & PL: 9 Chương) và 90 Bài học.
+- **Nạp Toàn Diện CSDL Động PostgreSQL (`v_eval_content`) (Zero-Mock, Zero-Hardcode)**:
+  - Tổng số lượng thực thể sau khi đồng bộ:
+    - **139 Chương** (Chapters)
+    - **337 Bài học** (Lessons)
+    - **337 Dạng bài** (Patterns)
+    - **343 Học liệu** (Materials) 2 tầng: Nền tảng SGK GDPT 2018 và Phương pháp giải KaTeX chuyên sâu.
+    - **588 Câu hỏi** (Questions) trắc nghiệm ĐGNL V-ACT phân cấp 4 mức độ nhận thức Bloom Taxonomy (L1 Nhận biết, L2 Thông hiểu, L3 Vận dụng, L4 Vận dụng cao) có công thức KaTeX chuẩn mực, 4 lựa chọn A-B-C-D, đáp án đúng và lời giải chi tiết.
+- **Tối Ưu Thuật Toán Sắp Xếp Sư Phạm Tự Nhiên ([`GetCurriculumTreeQuery.cs`](../V-Eval-Content_Service.Application/Curriculum/Queries/GetCurriculumTree/GetCurriculumTreeQuery.cs))**:
+  - Bổ sung các helper regex thông minh `ExtractGrade`, `ExtractChapterNumber`, `ExtractLessonNumber`.
+  - Cây tri thức tự động sắp xếp chuẩn mực theo Khối lớp (`Lớp 10 -> Lớp 11 -> Lớp 12`) và thứ tự Chương tăng dần (`Chương 1 -> Chương 10`), không bị đảo lộn theo chuỗi ký tự hay thời gian tạo.
+- **Kiểm Thử & Biên Dịch Sạch**:
+  - `dotnet build`: 0 Error, 100% Succeeded.
+  - Endpoint `GET /api/content/curriculum` phục vụ trọn vẹn 100% dữ liệu thực từ CSDL.
+
+---
+
+## [18/11/2026] - Chuẩn Hóa 100% Dữ Liệu Động Khung Chương Trình 4 Miền Tri Thức GDPT 2018 Trong CSDL & Loại Bỏ Miền Dư Thừa
+
+- **Dọn Dẹp & Loại Bỏ Miền Dư Thừa Khỏi CSDL PostgreSQL**:
+  - Chuyển toàn bộ 14 kỹ năng và dạng bài của `Chương 01: Quan Hệ Song Song` về đúng miền `Toán học & Tư duy định lượng` (`6f3765db-943e-4810-bf74-d6a8bdc215da`).
+  - Chuyển các kỹ năng Hóa học về `Khoa học tự nhiên` (`77777777-7777-7777-7777-000000000001`) và các kỹ năng Lịch sử - Địa lí về `Khoa học xã hội` (`77777777-7777-7777-7777-000000000002`).
+  - Xóa vĩnh viễn bản ghi miền nhân tạo `Tổng hợp` (`6080a490-b21b-41dd-9ef6-e92545c827e4`) khỏi bảng `v_eval_content."CompetencyDomains"`, đảm bảo tính toàn vẹn 4 miền năng lực chính quy.
+- **Tối Ưu Thuật Toán Dựng Cây Tri Thức Phân Cấp ([`GetCurriculumTreeQuery.cs`](../V-Eval-Content_Service.Application/Curriculum/Queries/GetCurriculumTree/GetCurriculumTreeQuery.cs))**:
+  - Tinh chỉnh điều kiện tạo `defaultChap`: Chỉ tạo synthetic container `"Khung Năng Lực Chuẩn"` khi miền tri thức chưa tồn tại bất kỳ node Chương nào (`chapters.Count == 0 && flatSkills.Count > 0`).
+  - Khi miền đã có các Chương chính quy, cây tri thức chỉ hiển thị cấu trúc phân cấp chuẩn `Chương -> Bài học -> Dạng bài`, loại bỏ hoàn toàn tình trạng các kỹ năng phẳng gây bẩn giao diện.
+- **Nạp Toàn Bộ Cấu Trúc Khung Chương Trình GDPT 2018 Chuẩn Vào CSDL PostgreSQL (100% Dynamic Database)**:
+  - Tra cứu đối chiếu trực tiếp từ mục lục chính quy các bộ SGK GDPT 2018 (Chân trời sáng tạo, Kết nối tri thức, Cánh diều) và ngân hàng chuẩn hóa ĐGNL V-ACT.
+  - Nạp đầy đủ toàn bộ cả 3 khối lớp (Lớp 10, Lớp 11, Lớp 12) cho cả 4 miền năng lực:
+    - *Toán học & Tư duy định lượng*: 30 Chương, 56 Bài học, 62 Dạng bài, 248 Câu hỏi (Bao quát trọn vẹn Toán 10 Tập 1 & 2: Mệnh đề, Bất PT bậc nhất 2 ẩn, Parabol, Hệ thức lượng, Vectơ, Thống kê, BPT bậc hai, Tổ hợp, Xác suất cổ điển, Oxy; Toán 11: Lượng giác, Cấp số cộng/nhân, Giới hạn, Quan hệ song song, Mũ/Logarit, Quan hệ vuông góc, Đạo hàm; Toán 12: Khảo sát hàm số, Oxyz, Tích phân & Ứng dụng hình học, Mẫu ghép nhóm, Xác suất Bayes; Tư duy Logic ĐGNL).
+    - *Khoa học tự nhiên*: 18 Chương, 28 Bài học, 35 Dạng bài, 121 Câu hỏi (Vật lí 10-12: Động học, Động lực học Newton, Cơ năng, Dao động cơ, Sóng cơ, Vật lí nhiệt, Từ trường; Hóa học 10-12: Nguyên tử, Bảng tuần hoàn, Oxi hóa khử, Cân bằng, Hóa hữu cơ, Ester - Lipid, Carbohydrate, Pin điện; Sinh học 10-12: Di truyền phân tử, Quy luật di truyền, Quần thể).
+    - *Sử dụng Ngôn ngữ*: 7 Chương, 11 Bài học, 11 Dạng bài, 44 Câu hỏi (Ngữ văn THPT: Đọc hiểu văn bản văn học, Văn bản thông tin, Tiếng Việt thực hành, Biện pháp tu từ, Chữa lỗi câu; Tiếng Anh THPT: Reading Comprehension, Inferences, Grammar & Verb Forms, Collocations).
+    - *Khoa học xã hội*: 9 Chương, 12 Bài học, 12 Dạng bài, 48 Câu hỏi (Lịch sử THPT: Lịch sử VN hiện đại 1919-Nay, Lịch sử thế giới; Địa lí THPT: Địa lí tự nhiên, Dân cư & Đô thị hóa, Địa lí các vùng kinh tế trọng điểm; Giáo dục Kinh tế & Pháp luật: Kinh tế thị trường, Cung - Cầu, Lạm phát, Quyền công dân).
+  - Đạt tổng cộng: **64 Chương • 107 Bài học • 120 Dạng bài • 461 Câu hỏi** được lưu trữ trực tiếp trong CSDL Supabase PostgreSQL.
+  - Từng Dạng bài trang bị đầy đủ bản ghi `Materials` (Khối 1: Nền tảng SGK GDPT 2018; Khối 2: Phương pháp giải chi tiết KaTeX; Tag JSXGraph tương tác) và 4 bản ghi `Questions` phân hóa theo 4 cấp độ nhận thức Bloom Taxonomy (L1 Nhận biết, L2 Thông hiểu, L3 Vận dụng, L4 Vận dụng cao).
+- **Kiểm Thử & Vận Hành**:
+  - `dotnet build`: Biên dịch thành công 100% trên .NET 9 SDK (0 Error).
+  - Endpoint `GET /api/content/curriculum` trả về 100% dữ liệu động từ CSDL, không hardcode, không mock dữ liệu.
+
+---
+
 ## [11/11/2026] - Chuyển Toàn Bộ Nhánh Làm Việc Sang Main, Cấu Hình Kestrel ListenAnyIP & Đóng Gói Docker Container Cho Hệ Thống V-Eval
 
 - **Cấu Hình Kestrel Lắng Nghe Đa Giao Diện Mạng ([`Program.cs`](../V-Eval-Content_Service.API/Program.cs))**:

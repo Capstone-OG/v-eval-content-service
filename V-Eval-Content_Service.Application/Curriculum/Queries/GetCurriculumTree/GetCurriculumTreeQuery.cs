@@ -62,9 +62,12 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
 
             var allSkills = d.Skills.OrderBy(s => s.CreatedAt).ThenBy(s => s.Name).ToList();
 
-            // 1. Cây 3 cấp động: Chương (Skills có ParentId == null và có con hoặc tên Chương)
+            // 1. Cây 3 cấp động: Chương (Skills có ParentId == null và có tên Chương hoặc có con)
             var chapters = allSkills
                 .Where(s => s.ParentId == null && (s.Name.StartsWith("Chương", StringComparison.OrdinalIgnoreCase) || allSkills.Any(c => c.ParentId == s.SkillId)))
+                .OrderBy(s => ExtractGrade(s.Name))
+                .ThenBy(s => ExtractChapterNumber(s.Name))
+                .ThenBy(s => s.Name)
                 .ToList();
 
             if (chapters.Count > 0)
@@ -82,7 +85,11 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
                         Lessons = new List<CurriculumLessonDto>()
                     };
 
-                    var lessons = allSkills.Where(s => s.ParentId == chap.SkillId).ToList();
+                    var lessons = allSkills
+                        .Where(s => s.ParentId == chap.SkillId)
+                        .OrderBy(s => ExtractLessonNumber(s.Name))
+                        .ThenBy(s => s.Name)
+                        .ToList();
                     int lesOrder = 1;
                     foreach (var les in lessons)
                     {
@@ -116,9 +123,9 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
                 }
             }
 
-            // 2. Kỹ năng phẳng (chưa lồng cây): Gom thành chuyên đề chuẩn để đảm bảo cấu trúc đồng nhất
+            // 2. Kỹ năng phẳng (chưa lồng cây): Gom thành chuyên đề chuẩn chỉ khi miền tri thức chưa có Chương nào
             var flatSkills = allSkills.Where(s => s.ParentId == null && !chapters.Contains(s)).ToList();
-            if (flatSkills.Count > 0)
+            if (chapters.Count == 0 && flatSkills.Count > 0)
             {
                 var defaultChap = new CurriculumChapterDto
                 {
@@ -166,7 +173,7 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
                     Level = q != null ? $"Bloom L{q.DifficultyLevel}" : "Chuẩn",
                     CrossModel = mat?.Title ?? "",
                     CrossNote = mat?.Content ?? "",
-                    Theory = mat?.Content ?? "Kiến thức chuẩn trong cơ sở dữ liệu.",
+                    Theory = mat?.Content ?? "",
                     KeyFormulas = ExtractFormulasFromContent(mat?.Content),
                     PrerequisiteIds = s.Prerequisites.Select(p => p.PrerequisiteId.ToString()).ToList(),
                     VideoLesson = mat != null ? new CurriculumVideoLessonDto
@@ -200,8 +207,8 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
         var mat = s.Materials.FirstOrDefault();
         var q = s.Questions.FirstOrDefault();
 
-        string theory = "Kiến thức nền tảng trong cơ sở dữ liệu.";
-        string method = "Phương pháp giải chi tiết trong cơ sở dữ liệu.";
+        string theory = "";
+        string method = "";
 
         if (mat != null && !string.IsNullOrWhiteSpace(mat.Content))
         {
@@ -324,5 +331,26 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
         }
 
         return ("Layers", "from-slate-700 to-slate-900", "bg-slate-50 border-slate-200 text-slate-700");
+    }
+
+    private static int ExtractGrade(string name)
+    {
+        var m = Regex.Match(name, @"Lớp\s*(\d+)", RegexOptions.IgnoreCase);
+        if (m.Success && int.TryParse(m.Groups[1].Value, out int grade)) return grade;
+        return 12;
+    }
+
+    private static int ExtractChapterNumber(string name)
+    {
+        var m = Regex.Match(name, @"Chương\s*(\d+)", RegexOptions.IgnoreCase);
+        if (m.Success && int.TryParse(m.Groups[1].Value, out int num)) return num;
+        return 99;
+    }
+
+    private static int ExtractLessonNumber(string name)
+    {
+        var m = Regex.Match(name, @"Bài\s*(\d+)", RegexOptions.IgnoreCase);
+        if (m.Success && int.TryParse(m.Groups[1].Value, out int num)) return num;
+        return 99;
     }
 }
