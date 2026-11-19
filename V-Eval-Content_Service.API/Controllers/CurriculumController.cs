@@ -54,12 +54,12 @@ public class CurriculumController : ApiControllerBase
     /// <remarks>
     /// - Cho phép cập nhật tên dạng, trọng số, Khối 1 (Nền tảng SGK), Khối 2 (Phương pháp giải KaTeX từng bước), Khối 3 (Video bài giảng), Khối 4 (Câu hỏi mẫu).
     /// </remarks>
-    [HttpPut("patterns/{id:guid}")]
+    [HttpPut("patterns/{id}")]
     [ProducesResponseType(typeof(CurriculumPatternDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> UpdatePattern([FromRoute] System.Guid id, [FromBody] UpdateCurriculumPatternDto dto)
+    public async Task<IActionResult> UpdatePattern([FromRoute] string id, [FromBody] UpdateCurriculumPatternDto dto)
     {
         var result = await Mediator.Send(new V_Eval_Content_Service.Application.Curriculum.Commands.UpdatePattern.UpdatePatternCommand(id, dto));
         return HandleResult(result);

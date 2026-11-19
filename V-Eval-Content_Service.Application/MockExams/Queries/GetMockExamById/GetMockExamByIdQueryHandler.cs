@@ -29,6 +29,12 @@ namespace V_Eval_Content_Service.Application.MockExams.Queries.GetMockExamById
                 .Include(e => e.ExamQuestions)
                     .ThenInclude(eq => eq.Question)
                         .ThenInclude(q => q.Skill)
+                            .ThenInclude(s => s.Domain)
+                .Include(e => e.ExamQuestions)
+                    .ThenInclude(eq => eq.Question)
+                        .ThenInclude(q => q.Skill)
+                            .ThenInclude(s => s.Parent)
+                                .ThenInclude(p => p!.Parent)
                 .FirstOrDefaultAsync(e => e.ExamId == request.ExamId, cancellationToken);
 
             if (exam == null)
@@ -99,6 +105,37 @@ namespace V_Eval_Content_Service.Application.MockExams.Queries.GetMockExamById
         private static ExamQuestionItemDto MapQuestionItem(ExamQuestion eq)
         {
             var q = eq.Question;
+            var skill = q.Skill;
+
+            // Lần ngược cây phả hệ 4 tầng: Domain -> Chapter -> Lesson -> Pattern
+            Skill? chapter = null;
+            Skill? lesson = null;
+            Skill? pattern = null;
+
+            if (skill != null)
+            {
+                if (skill.Parent?.Parent != null)
+                {
+                    chapter = skill.Parent.Parent;
+                    lesson = skill.Parent;
+                    pattern = skill;
+                }
+                else if (skill.Parent != null)
+                {
+                    chapter = skill.Parent;
+                    lesson = skill;
+                    pattern = skill;
+                }
+                else if (skill.Name.StartsWith("Chương", StringComparison.OrdinalIgnoreCase))
+                {
+                    chapter = skill;
+                }
+                else
+                {
+                    pattern = skill;
+                }
+            }
+
             return new ExamQuestionItemDto
             {
                 QuestionId = q.QuestionId,
@@ -114,8 +151,17 @@ namespace V_Eval_Content_Service.Application.MockExams.Queries.GetMockExamById
                 },
                 CorrectOption = q.CorrectOption.ToString(),
                 Explanation = q.Explanation,
-                SuggestedSkillName = q.Skill?.Name ?? "Tổng hợp",
-                DifficultyLevel = q.DifficultyLevel
+                SuggestedSkillName = skill?.Name ?? "Tổng hợp",
+                DifficultyLevel = q.DifficultyLevel,
+                SkillId = skill?.SkillId,
+                DomainId = skill?.DomainId,
+                DomainName = skill?.Domain?.Name,
+                ChapterId = chapter?.SkillId,
+                ChapterName = chapter?.Name,
+                LessonId = lesson?.SkillId,
+                LessonName = lesson?.Name,
+                PatternId = pattern?.SkillId,
+                PatternName = pattern?.Name
             };
         }
     }

@@ -27,29 +27,41 @@ namespace V_Eval_Content_Service.Application.MockExams.Commands.DeleteMockExam
                 return false;
             }
 
-            var questionIds = exam.ExamQuestions.Select(eq => eq.QuestionId).ToList();
+            var questionIds = exam.ExamQuestions.Select(eq => eq.QuestionId).Distinct().ToList();
 
-            var questions = await _context.Questions
-                .Where(q => questionIds.Contains(q.QuestionId))
+            // Chỉ xóa các câu hỏi không bị tham chiếu bởi đề thi nào khác (tránh lỗi khóa ngoại PostgreSQL 23503)
+            var sharedQuestionIds = await _context.ExamQuestions
+                .Where(eq => questionIds.Contains(eq.QuestionId) && eq.ExamId != request.ExamId)
+                .Select(eq => eq.QuestionId)
+                .Distinct()
                 .ToListAsync(cancellationToken);
 
-            var passageIds = questions
+            var exclusiveQuestionIds = questionIds.Except(sharedQuestionIds).ToList();
+
+            var exclusiveQuestions = await _context.Questions
+                .Where(q => exclusiveQuestionIds.Contains(q.QuestionId))
+                .ToListAsync(cancellationToken);
+
+            var passageIds = exclusiveQuestions
                 .Where(q => q.PassageId.HasValue)
                 .Select(q => q.PassageId!.Value)
                 .Distinct()
                 .ToList();
 
-            // Xóa liên kết ExamQuestions
+            // Xóa liên kết ExamQuestions của đề thi này
             _context.ExamQuestions.RemoveRange(exam.ExamQuestions);
 
-            // Xóa các câu hỏi thuộc đề thi này
-            _context.Questions.RemoveRange(questions);
+            // Xóa các câu hỏi độc quyền thuộc đề thi này
+            if (exclusiveQuestions.Count > 0)
+            {
+                _context.Questions.RemoveRange(exclusiveQuestions);
+            }
 
             // Kiểm tra và dọn dẹp các chùm đọc hiểu mồ côi (không còn câu hỏi nào khác sử dụng)
             foreach (var pId in passageIds)
             {
                 var hasOtherQuestions = await _context.Questions
-                    .AnyAsync(q => q.PassageId == pId && !questionIds.Contains(q.QuestionId), cancellationToken);
+                    .AnyAsync(q => q.PassageId == pId && !exclusiveQuestionIds.Contains(q.QuestionId), cancellationToken);
 
                 if (!hasOtherQuestions)
                 {
