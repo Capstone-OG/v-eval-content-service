@@ -30,4 +30,11 @@ public class DiagnosticQuestionItemDto
     public Dictionary<string, string> Options { get; set; } = new();
     public string SuggestedSkillName { get; set; } = string.Empty;
     public int DifficultyLevel { get; set; }
+    public Guid SkillId { get; set; }
+    public Guid DomainId { get; set; }
+    public string DomainName { get; set; } = string.Empty;
+    public string DomainCode { get; set; } = string.Empty;
+    public string SubjectName { get; set; } = string.Empty;
+    public string ChapterName { get; set; } = string.Empty;
+    public string LessonName { get; set; } = string.Empty;
 }

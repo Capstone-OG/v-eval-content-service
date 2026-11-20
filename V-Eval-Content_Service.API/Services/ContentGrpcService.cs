@@ -2,6 +2,7 @@ using Grpc.Core;
 using Microsoft.EntityFrameworkCore;
 using VEval.Shared.Grpc.Content;
 using V_Eval_Content_Service.Application.Common.Interfaces;
+using V_Eval_Content_Service.Application.Common.Helpers;
 using V_Eval_Content_Service.Domain.Entities;
 
 namespace V_Eval_Content_Service.API.Services;
@@ -17,6 +18,48 @@ public class ContentGrpcService : ContentService.ContentServiceBase
         _logger = logger;
     }
 
+    internal static string ResolveDomainCode(Guid domainId, string? domainName)
+        => SubjectTaxonomyHelper.ResolveDomainCode(domainId, domainName);
+
+    internal static string InferSubjectName(string? chapterName, string? skillName, string domainCode)
+        => SubjectTaxonomyHelper.InferSubjectName(chapterName, skillName, domainCode);
+
+    internal static (string Level, string ChapterName, string LessonName) ResolveSkillLineage(
+        Skill skill,
+        Dictionary<Guid, Skill> skillMap,
+        HashSet<Guid> parentIdsWithChildren)
+    {
+        if (!skill.ParentId.HasValue)
+        {
+            bool isChapter = skill.Name.StartsWith("Chương", StringComparison.OrdinalIgnoreCase)
+                || parentIdsWithChildren.Contains(skill.SkillId);
+            return isChapter
+                ? ("CHAPTER", skill.Name, string.Empty)
+                : ("LEGACY", string.Empty, string.Empty);
+        }
+
+        if (skillMap.TryGetValue(skill.ParentId.Value, out var parent))
+        {
+            if (!parent.ParentId.HasValue)
+            {
+                // Direct child of a Chapter -> LESSON (or leaf PATTERN if it has no children)
+                bool hasChildren = parentIdsWithChildren.Contains(skill.SkillId);
+                return hasChildren
+                    ? ("LESSON", parent.Name, skill.Name)
+                    : ("PATTERN", parent.Name, skill.Name);
+            }
+
+            if (skillMap.TryGetValue(parent.ParentId.Value, out var grandParent))
+            {
+                return ("PATTERN", grandParent.Name, parent.Name);
+            }
+
+            return ("PATTERN", parent.Name, skill.Name);
+        }
+
+        return ("PATTERN", string.Empty, string.Empty);
+    }
+
     public override async Task<GetSkillsTreeResponse> GetSkillsTree(
         GetSkillsTreeRequest request,
         ServerCallContext context)
@@ -28,32 +71,71 @@ public class ContentGrpcService : ContentService.ContentServiceBase
             .OrderBy(s => s.SkillId)
             .ToListAsync(context.CancellationToken);
 
+        var skillMap = skills.ToDictionary(s => s.SkillId);
+        var parentIdsWithChildren = skills
+            .Where(s => s.ParentId.HasValue)
+            .Select(s => s.ParentId!.Value)
+            .ToHashSet();
+
+        var materialsBySkill = await _context.Materials
+            .AsNoTracking()
+            .GroupBy(m => m.SkillId)
+            .Select(g => new
+            {
+                SkillId = g.Key,
+                MaterialId = g.OrderBy(m => m.CreatedAt).Select(m => m.MaterialId).FirstOrDefault(),
+                VideoUrl = g.OrderBy(m => m.CreatedAt).Select(m => m.VideoUrl).FirstOrDefault(v => !string.IsNullOrEmpty(v))
+            })
+            .ToDictionaryAsync(x => x.SkillId, context.CancellationToken);
+
+        var questionCountsBySkill = await _context.Questions
+            .AsNoTracking()
+            .GroupBy(q => q.SkillId)
+            .Select(g => new { SkillId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.SkillId, x => x.Count, context.CancellationToken);
+
+        bool learningNodesOnly = string.Equals(request.SubjectId, "LEARNING_NODES", StringComparison.OrdinalIgnoreCase);
+
         var response = new GetSkillsTreeResponse();
 
         foreach (var s in skills)
         {
-            string domainCode = s.DomainId.ToString().ToLowerInvariant() switch
+            var domainCode = ResolveDomainCode(s.DomainId, s.Domain?.Name);
+            var (level, chapterName, lessonName) = ResolveSkillLineage(s, skillMap, parentIdsWithChildren);
+
+            if (learningNodesOnly && level != "PATTERN")
             {
-                "b581ee4c-7277-4be8-a156-c5b20a0a59f6" => "DOM_LANG",
-                "6f3765db-943e-4810-bf74-d6a8bdc215da" => "DOM_MATH",
-                "77777777-7777-7777-7777-000000000001" => "DOM_NAT_SCI",
-                "77777777-7777-7777-7777-000000000002" => "DOM_SOC_SCI",
-                _ => !string.IsNullOrEmpty(s.Domain?.Name) && s.Domain.Name.Contains("Ngôn ngữ", StringComparison.OrdinalIgnoreCase) ? "DOM_LANG"
-                   : !string.IsNullOrEmpty(s.Domain?.Name) && s.Domain.Name.Contains("Toán", StringComparison.OrdinalIgnoreCase) ? "DOM_MATH"
-                   : !string.IsNullOrEmpty(s.Domain?.Name) && s.Domain.Name.Contains("tự nhiên", StringComparison.OrdinalIgnoreCase) ? "DOM_NAT_SCI"
-                   : !string.IsNullOrEmpty(s.Domain?.Name) && s.Domain.Name.Contains("xã hội", StringComparison.OrdinalIgnoreCase) ? "DOM_SOC_SCI"
-                   : "DOM_UNKNOWN"
-            };
+                continue;
+            }
+
+            var subjectName = InferSubjectName(chapterName, s.Name, domainCode);
+
+            materialsBySkill.TryGetValue(s.SkillId, out var mat);
+            // If pattern has no direct material, inherit parent lesson's material
+            if (mat == null && s.ParentId.HasValue)
+            {
+                materialsBySkill.TryGetValue(s.ParentId.Value, out mat);
+            }
+
+            questionCountsBySkill.TryGetValue(s.SkillId, out var qCount);
 
             var node = new SkillNode
             {
                 SkillId = s.SkillId.ToString(),
                 Name = s.Name,
-                Description = s.Domain?.Name ?? string.Empty,
+                Description = !string.IsNullOrEmpty(chapterName) ? $"{subjectName} • {chapterName}" : (s.Domain?.Name ?? string.Empty),
                 Weight = s.Weight ?? 0.05,
                 DomainId = s.DomainId.ToString(),
                 DomainName = s.Domain?.Name ?? string.Empty,
-                DomainCode = domainCode
+                DomainCode = domainCode,
+                ParentId = s.ParentId?.ToString() ?? string.Empty,
+                Level = level,
+                ChapterName = chapterName,
+                LessonName = lessonName,
+                SubjectName = subjectName,
+                MaterialId = mat != null && mat.MaterialId != Guid.Empty ? mat.MaterialId.ToString() : string.Empty,
+                VideoUrl = mat?.VideoUrl ?? string.Empty,
+                QuestionCount = qCount
             };
 
             foreach (var prereq in s.Prerequisites)
@@ -64,7 +146,57 @@ public class ContentGrpcService : ContentService.ContentServiceBase
             response.Skills.Add(node);
         }
 
-        _logger.LogInformation("Delivered skills tree with {Count} skills for path planning.", response.Skills.Count);
+        _logger.LogInformation("Delivered skills tree with {Count} skills (filter={Filter}).", response.Skills.Count, request.SubjectId);
+        return response;
+    }
+
+    public override async Task<GetQuestionsByDifficultyResponse> GetQuestionsByDifficulty(
+        GetQuestionsByDifficultyRequest request,
+        ServerCallContext context)
+    {
+        var skillIds = request.SkillIds
+            .Select(id => Guid.TryParse(id, out var g) ? g : Guid.Empty)
+            .Where(g => g != Guid.Empty)
+            .ToList();
+
+        var query = _context.Questions
+            .AsNoTracking()
+            .Include(q => q.Skill)
+            .AsQueryable();
+
+        if (skillIds.Count > 0)
+        {
+            query = query.Where(q => skillIds.Contains(q.SkillId));
+        }
+
+        var diff = (request.Difficulty ?? string.Empty).Trim().ToUpperInvariant();
+        query = diff switch
+        {
+            "EASY" => query.Where(q => q.DifficultyLevel <= 2),
+            "MEDIUM" => query.Where(q => q.DifficultyLevel == 3),
+            "HARD" => query.Where(q => q.DifficultyLevel >= 4),
+            _ => query
+        };
+
+        int limit = request.Limit > 0 ? Math.Min(request.Limit, 100) : 20;
+        var questions = await query
+            .OrderBy(q => q.DifficultyLevel)
+            .ThenBy(q => q.CreatedAt)
+            .Take(limit)
+            .ToListAsync(context.CancellationToken);
+
+        var response = new GetQuestionsByDifficultyResponse();
+        foreach (var q in questions)
+        {
+            response.Questions.Add(new QuestionSummary
+            {
+                QuestionId = q.QuestionId.ToString(),
+                SkillId = q.SkillId.ToString(),
+                Difficulty = q.DifficultyLevel.ToString(),
+                Title = q.Skill?.Name ?? "Câu hỏi khảo thí"
+            });
+        }
+
         return response;
     }
 
@@ -80,6 +212,8 @@ public class ContentGrpcService : ContentService.ContentServiceBase
         var examQuestions = await _context.ExamQuestions
             .AsNoTracking()
             .Include(eq => eq.Question)
+                .ThenInclude(q => q.Passage)
+            .Include(eq => eq.Question)
                 .ThenInclude(q => q.Skill)
                     .ThenInclude(s => s.Domain)
             .Where(eq => eq.ExamId == examId)
@@ -91,6 +225,13 @@ public class ContentGrpcService : ContentService.ContentServiceBase
             throw new RpcException(new Status(StatusCode.NotFound, $"Không tìm thấy câu hỏi nào cho đề thi {examId}."));
         }
 
+        var allSkills = await _context.Skills.AsNoTracking().ToListAsync(context.CancellationToken);
+        var skillMap = allSkills.ToDictionary(s => s.SkillId);
+        var parentIdsWithChildren = allSkills
+            .Where(s => s.ParentId.HasValue)
+            .Select(s => s.ParentId!.Value)
+            .ToHashSet();
+
         var response = new GetExamAnswerKeyResponse
         {
             ExamId = examId.ToString()
@@ -98,17 +239,46 @@ public class ContentGrpcService : ContentService.ContentServiceBase
 
         foreach (var eq in examQuestions)
         {
-            response.AnswerKeys.Add(new QuestionAnswerKey
+            var q = eq.Question;
+            var domainId = q.Skill?.DomainId ?? Guid.Empty;
+            var domainName = q.Skill?.Domain?.Name ?? string.Empty;
+            var domainCode = ResolveDomainCode(domainId, domainName);
+
+            string chapterName = string.Empty;
+            string lessonName = string.Empty;
+            if (q.Skill != null)
+            {
+                (_, chapterName, lessonName) = ResolveSkillLineage(q.Skill, skillMap, parentIdsWithChildren);
+            }
+
+            var subjectName = InferSubjectName(chapterName, q.Skill?.Name, domainCode);
+
+            var key = new QuestionAnswerKey
             {
                 QuestionId = eq.QuestionId.ToString(),
                 QuestionOrder = eq.QuestionOrder,
-                CorrectOption = eq.Question.CorrectOption.ToString(),
-                SkillId = eq.Question.SkillId.ToString(),
-                DifficultyLevel = eq.Question.DifficultyLevel,
-                SkillName = eq.Question.Skill?.Name ?? string.Empty,
-                DomainId = eq.Question.Skill?.DomainId.ToString() ?? string.Empty,
-                DomainName = eq.Question.Skill?.Domain?.Name ?? string.Empty
-            });
+                CorrectOption = q.CorrectOption.ToString(),
+                SkillId = q.SkillId.ToString(),
+                DifficultyLevel = q.DifficultyLevel,
+                SkillName = q.Skill?.Name ?? string.Empty,
+                DomainId = domainId != Guid.Empty ? domainId.ToString() : string.Empty,
+                DomainName = domainName,
+                Content = q.ContentLatex ?? string.Empty,
+                Explanation = q.Explanation ?? string.Empty,
+                PassageContent = q.Passage?.Content ?? string.Empty,
+                PassageTitle = q.Passage?.Title ?? string.Empty,
+                DomainCode = domainCode,
+                SubjectName = subjectName,
+                ChapterName = chapterName,
+                LessonName = lessonName
+            };
+
+            key.Options.Add(q.OptionA ?? string.Empty);
+            key.Options.Add(q.OptionB ?? string.Empty);
+            key.Options.Add(q.OptionC ?? string.Empty);
+            key.Options.Add(q.OptionD ?? string.Empty);
+
+            response.AnswerKeys.Add(key);
         }
 
         _logger.LogInformation("Delivered answer keys for exam {ExamId} ({Count} questions)", examId, examQuestions.Count);
@@ -127,12 +297,36 @@ public class ContentGrpcService : ContentService.ContentServiceBase
         var question = await _context.Questions
             .AsNoTracking()
             .Include(q => q.Skill)
+                .ThenInclude(s => s.Domain)
             .FirstOrDefaultAsync(q => q.QuestionId == questionId, context.CancellationToken);
 
         if (question == null)
         {
             throw new RpcException(new Status(StatusCode.NotFound, $"Không tìm thấy câu hỏi {questionId}."));
         }
+
+        var domainId = question.Skill?.DomainId ?? Guid.Empty;
+        var domainName = question.Skill?.Domain?.Name ?? string.Empty;
+        var domainCode = ResolveDomainCode(domainId, domainName);
+
+        string chapterName = string.Empty;
+        if (question.Skill?.ParentId.HasValue == true)
+        {
+            var parent = await _context.Skills.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.SkillId == question.Skill.ParentId.Value, context.CancellationToken);
+            if (parent?.ParentId.HasValue == true)
+            {
+                var grandParent = await _context.Skills.AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.SkillId == parent.ParentId.Value, context.CancellationToken);
+                chapterName = grandParent?.Name ?? parent.Name;
+            }
+            else if (parent != null)
+            {
+                chapterName = parent.Name;
+            }
+        }
+
+        var subjectName = InferSubjectName(chapterName, question.Skill?.Name, domainCode);
 
         var response = new GetQuestionDetailResponse
         {
@@ -141,7 +335,11 @@ public class ContentGrpcService : ContentService.ContentServiceBase
             Difficulty = question.DifficultyLevel.ToString(),
             Title = question.Skill?.Name ?? "Câu hỏi khảo thí",
             Content = question.ContentLatex,
-            Explanation = question.Explanation ?? string.Empty
+            Explanation = question.Explanation ?? string.Empty,
+            DomainId = domainId != Guid.Empty ? domainId.ToString() : string.Empty,
+            DomainName = domainName,
+            DomainCode = domainCode,
+            SubjectName = subjectName
         };
 
         response.Options.Add(new AnswerOption { OptionId = "A", Content = question.OptionA ?? string.Empty, IsCorrect = question.CorrectOption == 'A' });
@@ -156,130 +354,240 @@ public class ContentGrpcService : ContentService.ContentServiceBase
         GetMilestoneQuizRequest request,
         ServerCallContext context)
     {
-        _logger.LogInformation("Nhận yêu cầu GetMilestoneQuiz: SkillId={SkillId}, ExamId={ExamId}, Count={Count}",
-            request.SkillId, request.ExamId, request.QuestionCount);
+        _logger.LogInformation("Nhận yêu cầu GetMilestoneQuiz: SkillId={SkillId}, ExamId={ExamId}, Count={Count}, ReadOnly={ReadOnly}",
+            request.SkillId, request.ExamId, request.QuestionCount, request.ReadOnly);
 
         int count = request.QuestionCount > 0 ? request.QuestionCount : 5;
         Guid? parsedExamId = Guid.TryParse(request.ExamId, out var eid) ? eid : null;
         Guid? parsedSkillId = Guid.TryParse(request.SkillId, out var sid) ? sid : null;
 
         var questionsList = new List<Question>();
+        var seenIds = new HashSet<Guid>();
         string title = "Bài Quiz củng cố chặng học";
         Guid finalExamId = parsedExamId ?? Guid.NewGuid();
 
-        // 1. Nếu có ExamId, tìm câu hỏi gắn với đề thi đó
-        if (parsedExamId.HasValue)
+        static bool IsBrokenOrphanPassageQuestion(Question q)
         {
-            var examQuestions = await _context.ExamQuestions
-                .AsNoTracking()
-                .Include(eq => eq.Question)
-                    .ThenInclude(q => q.Skill)
-                .Where(eq => eq.ExamId == parsedExamId.Value)
-                .OrderBy(eq => eq.QuestionOrder)
-                .ToListAsync(context.CancellationToken);
+            if (q.Passage != null && !string.IsNullOrWhiteSpace(q.Passage.Content)) return false;
+            var text = (q.ContentLatex ?? string.Empty).ToLowerInvariant();
+            return text.Contains("of the passage") || text.Contains("the passage") || text.Contains("in paragraph")
+                || text.Contains("đoạn văn trên") || text.Contains("văn bản trên") || text.Contains("bài đọc trên")
+                || text.Contains("ngữ liệu trên") || text.Contains("thông tin trên") || text.Contains("đoạn trích trên");
+        }
 
-            if (examQuestions.Count > 0)
+        void AppendUnique(IEnumerable<Question> items)
+        {
+            foreach (var q in items)
             {
-                questionsList = examQuestions.Select(eq => eq.Question).ToList();
-                var exam = await _context.MockExams
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(e => e.ExamId == parsedExamId.Value, context.CancellationToken);
-                if (exam != null)
+                if (questionsList.Count >= count) break;
+                if (IsBrokenOrphanPassageQuestion(q)) continue;
+                if (seenIds.Add(q.QuestionId))
                 {
-                    title = exam.Title;
+                    questionsList.Add(q);
                 }
             }
         }
 
-        // 2. Nếu chưa có câu hỏi từ ExamId, tìm theo SkillId
-        if (questionsList.Count == 0 && parsedSkillId.HasValue)
+        // 1. Nếu có SkillId: Ưu tiên tối thượng là KHOANH VÙNG CHUẨN XÁC MÔN HỌC (Subject Isolation - Tuyệt đối không lẫn môn khác!)
+        if (parsedSkillId.HasValue)
         {
-            var skillQuestions = await _context.Questions
-                .AsNoTracking()
-                .Include(q => q.Skill)
-                .Where(q => q.SkillId == parsedSkillId.Value)
-                .Take(count)
-                .ToListAsync(context.CancellationToken);
+            var allSkills = await _context.Skills.AsNoTracking().ToListAsync(context.CancellationToken);
+            var skillMap = allSkills.ToDictionary(s => s.SkillId);
 
-            questionsList.AddRange(skillQuestions);
-
-            var skill = await _context.Skills
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.SkillId == parsedSkillId.Value, context.CancellationToken);
-            if (skill != null)
+            if (skillMap.TryGetValue(parsedSkillId.Value, out var targetSkill))
             {
-                title = $"Bài Quiz củng cố: {skill.Name}";
-            }
-        }
+                title = $"Bài Quiz củng cố: {targetSkill.Name}";
 
-        // 3. Fallback: Nếu ngân hàng chưa đủ câu hỏi cho skill cụ thể, lấy các câu hỏi mẫu để sinh Quiz
-        if (questionsList.Count < count)
-        {
-            int remaining = count - questionsList.Count;
-            var existingIds = questionsList.Select(q => q.QuestionId).ToHashSet();
-            var fallbackQuestions = await _context.Questions
-                .AsNoTracking()
-                .Include(q => q.Skill)
-                .Where(q => !existingIds.Contains(q.QuestionId))
-                .Take(remaining)
-                .ToListAsync(context.CancellationToken);
+                var parentIdsWithChildren = allSkills.Where(s => s.ParentId.HasValue).Select(s => s.ParentId!.Value).ToHashSet();
+                var targetDomainCode = ResolveDomainCode(targetSkill.DomainId, null);
+                var (_, targetCh, _) = ResolveSkillLineage(targetSkill, skillMap, parentIdsWithChildren);
+                var targetSubject = InferSubjectName(targetCh, targetSkill.Name, targetDomainCode);
 
-            questionsList.AddRange(fallbackQuestions);
-        }
+                // Xác định TẤT CẢ các Skill thuộc CÙNG MÔN HỌC này (Toán học, Ngữ văn, Tiếng Anh, v.v.)
+                var sameSubjectSkillIds = allSkills
+                    .Where(s =>
+                    {
+                        var sDomainCode = ResolveDomainCode(s.DomainId, null);
+                        var (_, ch, _) = ResolveSkillLineage(s, skillMap, parentIdsWithChildren);
+                        return InferSubjectName(ch, s.Name, sDomainCode) == targetSubject;
+                    })
+                    .Select(s => s.SkillId)
+                    .ToHashSet();
 
-        // 4. Nếu database chưa có câu hỏi nào (edge case cực hiếm), tạo câu hỏi mẫu chuẩn
-        if (questionsList.Count == 0)
-        {
-            var dummySkillId = parsedSkillId ?? Guid.NewGuid();
-            for (int i = 1; i <= count; i++)
-            {
-                questionsList.Add(new Question
+                // 1a. Nếu có ExamId được truyền vào: CHỈ LẤY những câu hỏi trong đề thi đó mà THUỘC CÙNG MÔN HỌC!
+                if (parsedExamId.HasValue)
                 {
-                    QuestionId = Guid.NewGuid(),
-                    SkillId = dummySkillId,
-                    DifficultyLevel = 2,
-                    ContentLatex = $"Câu hỏi củng cố số {i}: Chọn phương án đúng nhất.",
-                    OptionA = "Phương án A",
-                    OptionB = "Phương án B",
-                    OptionC = "Phương án C",
-                    OptionD = "Phương án D",
-                    CorrectOption = 'A'
-                });
+                    var examQuestions = await _context.ExamQuestions
+                        .AsNoTracking()
+                        .Include(eq => eq.Question)
+                            .ThenInclude(q => q.Passage)
+                        .Include(eq => eq.Question)
+                            .ThenInclude(q => q.Skill)
+                        .Where(eq => eq.ExamId == parsedExamId.Value)
+                        .OrderBy(eq => eq.QuestionOrder)
+                        .ToListAsync(context.CancellationToken);
+
+                    if (examQuestions.Count > 0)
+                    {
+                        var sameSubjectExamQuestions = examQuestions
+                            .Where(eq => sameSubjectSkillIds.Contains(eq.Question.SkillId))
+                            .Select(eq => eq.Question);
+                        AppendUnique(sameSubjectExamQuestions);
+
+                        var exam = await _context.MockExams
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(e => e.ExamId == parsedExamId.Value, context.CancellationToken);
+                        if (exam != null) title = exam.Title;
+                    }
+                }
+
+                // 1b. Ưu tiên cao nhất: Câu hỏi đúng dạng bài (targetSkill) và các skill con/cháu
+                if (questionsList.Count < count)
+                {
+                    var directAndChildIds = new HashSet<Guid> { targetSkill.SkillId };
+                    foreach (var child in allSkills.Where(s => s.ParentId == targetSkill.SkillId))
+                    {
+                        directAndChildIds.Add(child.SkillId);
+                        foreach (var grandChild in allSkills.Where(s => s.ParentId == child.SkillId))
+                        {
+                            directAndChildIds.Add(grandChild.SkillId);
+                        }
+                    }
+
+                    var directQuestions = await _context.Questions
+                        .AsNoTracking()
+                        .Include(q => q.Passage)
+                        .Include(q => q.Skill)
+                        .Where(q => directAndChildIds.Contains(q.SkillId) && !seenIds.Contains(q.QuestionId))
+                        .OrderBy(q => q.DifficultyLevel)
+                        .ThenBy(q => q.CreatedAt)
+                        .Take((count - questionsList.Count) * 2)
+                        .ToListAsync(context.CancellationToken);
+                    AppendUnique(directQuestions);
+                }
+
+                // 1c. Ưu tiên 2: Cùng Chương (sibling patterns/lessons trong cùng chapter của môn học)
+                if (questionsList.Count < count && targetSkill.ParentId.HasValue)
+                {
+                    var chapterId = targetSkill.ParentId.Value;
+                    if (skillMap.TryGetValue(chapterId, out var p) && p.ParentId.HasValue)
+                    {
+                        chapterId = p.ParentId.Value;
+                    }
+
+                    var chapterSkillIds = allSkills
+                        .Where(s => s.SkillId == chapterId || s.ParentId == chapterId
+                            || (s.ParentId.HasValue && skillMap.TryGetValue(s.ParentId.Value, out var sp) && sp.ParentId == chapterId))
+                        .Where(s => sameSubjectSkillIds.Contains(s.SkillId))
+                        .Select(s => s.SkillId)
+                        .ToHashSet();
+
+                    if (chapterSkillIds.Count > 0)
+                    {
+                        var chapterQuestions = await _context.Questions
+                            .AsNoTracking()
+                            .Include(q => q.Passage)
+                            .Include(q => q.Skill)
+                            .Where(q => chapterSkillIds.Contains(q.SkillId) && !seenIds.Contains(q.QuestionId))
+                            .OrderBy(q => q.DifficultyLevel)
+                            .Take((count - questionsList.Count) * 2)
+                            .ToListAsync(context.CancellationToken);
+                        AppendUnique(chapterQuestions);
+                    }
+                }
+
+                // 1d. Ưu tiên 3: Mở rộng trong CÙNG MÔN HỌC (đảm bảo đủ dải Bloom L1-L4 cho ZPD nhưng TUYỆT ĐỐI KHÔNG LẪN MÔN KHÁC)
+                if (questionsList.Count < count)
+                {
+                    var sameSubjectQuestions = await _context.Questions
+                        .AsNoTracking()
+                        .Include(q => q.Passage)
+                        .Include(q => q.Skill)
+                        .Where(q => sameSubjectSkillIds.Contains(q.SkillId) && !seenIds.Contains(q.QuestionId))
+                        .OrderBy(q => q.DifficultyLevel)
+                        .Take((count - questionsList.Count) * 2)
+                        .ToListAsync(context.CancellationToken);
+                    AppendUnique(sameSubjectQuestions);
+                }
+
+                // TUYỆT ĐỐI KHÔNG CÓ BƯỚC 2d (same domain) HAY BƯỚC 3 (fallback toàn bộ bảng questions)!
+                // Khi học sinh học chặng Toán học, chỉ trả về câu hỏi Toán học. Nếu ngân hàng có bao nhiêu câu thì trả về bấy nhiêu câu.
+            }
+        }
+        else
+        {
+            // Trường hợp KHÔNG có SkillId cụ thể (ví dụ yêu cầu lấy đề thi thuần túy theo ExamId):
+            if (parsedExamId.HasValue)
+            {
+                var examQuestions = await _context.ExamQuestions
+                    .AsNoTracking()
+                    .Include(eq => eq.Question)
+                        .ThenInclude(q => q.Passage)
+                    .Include(eq => eq.Question)
+                        .ThenInclude(q => q.Skill)
+                    .Where(eq => eq.ExamId == parsedExamId.Value)
+                    .OrderBy(eq => eq.QuestionOrder)
+                    .ToListAsync(context.CancellationToken);
+
+                if (examQuestions.Count > 0)
+                {
+                    AppendUnique(examQuestions.Select(eq => eq.Question));
+                    var exam = await _context.MockExams
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(e => e.ExamId == parsedExamId.Value, context.CancellationToken);
+                    if (exam != null) title = exam.Title;
+                }
+            }
+
+            if (questionsList.Count < count)
+            {
+                var fallbackQuestions = await _context.Questions
+                    .AsNoTracking()
+                    .Include(q => q.Passage)
+                    .Include(q => q.Skill)
+                    .Where(q => !seenIds.Contains(q.QuestionId))
+                    .OrderBy(q => q.DifficultyLevel)
+                    .Take((count - questionsList.Count) * 2)
+                    .ToListAsync(context.CancellationToken);
+                AppendUnique(fallbackQuestions);
             }
         }
 
-        // Tạo hoặc liên kết MockExam và ExamQuestions để lưu bảng đáp án phục vụ API 6 chấm điểm bảo mật
-        var existingExam = await _context.MockExams
-            .FirstOrDefaultAsync(e => e.ExamId == finalExamId, context.CancellationToken);
-
-        if (existingExam == null)
+        // Chỉ lưu MockExam mới khi Caller truyền ExamId cụ thể VÀ không đặt ReadOnly=true
+        // Tránh spam tạo hàng chục đề TOPICAL_PRACTICE rác vào bảng MockExams mỗi lần gọi PLAR!
+        if (!request.ReadOnly && parsedExamId.HasValue && questionsList.Count > 0)
         {
-            var newExam = new MockExam
-            {
-                ExamId = finalExamId,
-                Title = title,
-                DurationMinutes = count * 2, // 2 phút/câu
-                TotalQuestions = questionsList.Count,
-                IsPublished = true,
-                ExamCategory = "TOPICAL_PRACTICE",
-                CreatedAt = DateTime.UtcNow
-            };
+            var existingExam = await _context.MockExams
+                .FirstOrDefaultAsync(e => e.ExamId == finalExamId, context.CancellationToken);
 
-            _context.MockExams.Add(newExam);
-
-            int order = 1;
-            foreach (var q in questionsList)
+            if (existingExam == null)
             {
-                _context.ExamQuestions.Add(new ExamQuestion
+                var newExam = new MockExam
                 {
                     ExamId = finalExamId,
-                    QuestionId = q.QuestionId,
-                    QuestionOrder = order++
-                });
-            }
+                    Title = title,
+                    DurationMinutes = count * 2,
+                    TotalQuestions = questionsList.Count,
+                    IsPublished = true,
+                    ExamCategory = "TOPICAL_PRACTICE",
+                    CreatedAt = DateTime.UtcNow
+                };
 
-            await _context.SaveChangesAsync(context.CancellationToken);
-            _logger.LogInformation("Đã khởi tạo đề Quiz củng cố {ExamId} ({Count} câu) cho chặng học.", finalExamId, questionsList.Count);
+                _context.MockExams.Add(newExam);
+
+                int order = 1;
+                foreach (var q in questionsList)
+                {
+                    _context.ExamQuestions.Add(new ExamQuestion
+                    {
+                        ExamId = finalExamId,
+                        QuestionId = q.QuestionId,
+                        QuestionOrder = order++
+                    });
+                }
+
+                await _context.SaveChangesAsync(context.CancellationToken);
+            }
         }
 
         var response = new GetMilestoneQuizResponse
@@ -300,7 +608,10 @@ public class ContentGrpcService : ContentService.ContentServiceBase
                 Content = q.ContentLatex,
                 DifficultyLevel = q.DifficultyLevel,
                 SkillId = q.SkillId.ToString(),
-                SkillName = q.Skill?.Name ?? "Kỹ năng chuyên đề"
+                SkillName = q.Skill?.Name ?? "Kỹ năng chuyên đề",
+                PassageTitle = q.Passage?.Title ?? string.Empty,
+                PassageContent = q.Passage?.Content ?? string.Empty,
+                PassageImageUrl = q.Passage?.ImageUrl ?? string.Empty
             };
 
             // Tuyệt đối bảo mật: KHÔNG trả về IsCorrect hay CorrectOption cho Client học sinh!
