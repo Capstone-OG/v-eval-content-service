@@ -367,3 +367,13 @@ To avoid architectural ambiguity, the system establishes a clear dual ingestion 
   - Automated unit tests in `ContentGrpcServiceSubjectIsolationTests.cs` verify strict isolation between Mathematics, Literature, English, Chemistry, and other disciplines.
   - `dotnet build --no-restore`: 0 Warnings, 0 Errors.
   - `dotnet test --no-restore`: **16/16 Passed 100%**.
+
+
+---
+
+### [22/11/2026] - Chapter-Scoped Precision & Content Language Mismatch Guard in `GetMilestoneQuiz`
+- **Target Files**: `SubjectTaxonomyHelper.cs`, `ContentGrpcService.cs`, `ContentGrpcServiceSubjectIsolationTests.cs`.
+- **Key Deliverables**:
+  1. Added `SubjectTaxonomyHelper.IsContentLanguageMismatch` to filter out misclassified pure-English items stored under non-English skills (e.g., Chemistry).
+  2. Restricted same-subject expansion (`Step 1d`) to trigger only when `questionsList.Count == 0`, preventing cross-chapter pollution (e.g., geometry questions leaking into combinatorics milestones).
+  3. **Verification**: `dotnet test --no-restore` passed **18/18** unit tests.

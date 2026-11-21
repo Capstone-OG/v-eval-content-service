@@ -60,4 +60,20 @@ public class ContentGrpcServiceSubjectIsolationTests
         // Assert
         Assert.Equal(expectedCode, code);
     }
+
+    [Fact]
+    public void IsContentLanguageMismatch_EnglishQuestionInChemistry_ReturnsTrue()
+    {
+        var englishQuestion = "The weather today is ______ than yesterday, so you should wear a jacket if you go out.";
+        Assert.True(SubjectTaxonomyHelper.IsContentLanguageMismatch(englishQuestion, "Hóa học"));
+        Assert.True(SubjectTaxonomyHelper.IsContentLanguageMismatch(englishQuestion, "Toán học"));
+        Assert.False(SubjectTaxonomyHelper.IsContentLanguageMismatch(englishQuestion, "Tiếng Anh"));
+    }
+
+    [Fact]
+    public void IsContentLanguageMismatch_VietnameseChemistryQuestion_ReturnsFalse()
+    {
+        var chemQuestion = "Nguyên tử của nguyên tố X có tổng số hạt proton, neutron, electron là 52.";
+        Assert.False(SubjectTaxonomyHelper.IsContentLanguageMismatch(chemQuestion, "Hóa học"));
+    }
 }
