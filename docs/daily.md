@@ -1,5 +1,15 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [22/11/2026] - Chặn Câu Hỏi Tiếng Anh Gán Nhầm Môn & Siết Chặt Biên Giới Chương Trong `GetMilestoneQuiz` PLAR
+
+- **Bộ Lọc Ngôn Ngữ Chống Lọt Câu Tiếng Anh ([`SubjectTaxonomyHelper.cs`](../V-Eval-Content_Service.Application/Common/Helpers/SubjectTaxonomyHelper.cs), [`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
+  - Thêm hàm `IsContentLanguageMismatch(contentLatex, targetSubject)` để phát hiện và loại bỏ câu hỏi Tiếng Anh thuần bị gán nhầm vào `SkillId` môn khác trong CSDL (vd: câu ngữ pháp `"The weather today is ..."` nằm trong kỹ năng Hóa học 11).
+- **Siết Chặt Mở Rộng Cùng Môn (`Step 1d`)**:
+  - Chỉ mở rộng sang toàn môn học khi cả dạng bài (`directAndChildIds`) lẫn chương hiện tại (`chapterSkillIds`) có **0 câu hỏi**. Khi đã có câu hỏi đúng dạng bài/cùng chương, hệ thống không trộn câu hỏi từ chương khác (khắc phục lỗi *Tổ hợp - Xác suất* dính câu *Độ dài đường thẳng*).
+- **Kiểm Thử**: `dotnet test --no-restore` đạt **18/18 Passed (100%)**.
+
+---
+
 ## [21/11/2026] - Hotfix Phân Lập Biên Giới Môn Học (Subject Boundary Isolation), Tách `SubjectTaxonomyHelper` & Xóa Bỏ Hoàn Toàn Rò Rỉ Câu Hỏi Chéo Môn Trong Chu Trình PLAR
 
 - **Khắc Phục Lỗi Rò Rỉ Chéo Môn Học (Cross-Subject Leakage)**:
