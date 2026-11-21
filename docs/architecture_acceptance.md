@@ -337,3 +337,33 @@ To avoid architectural ambiguity, the system establishes a clear dual ingestion 
 
 
 
+
+
+---
+
+### [20/11/2026] - Full `content.proto` Hierarchy & Passage Sync, 3 Balanced GDPT 2018 Diagnostic Suites & Read-Only PLAR Question Delivery
+- **Canonical `content.proto` & Passage Context Delivery**: Unified `V-Eval-Content_Service`, `V-Eval-Practice_Service`, and `System-Repo/grpc/content.proto` with hierarchical `SkillNode` fields (`parent_id`, `level`, `chapter_name`, `lesson_name`, `subject_name`, `material_id`, `video_url`, `question_count`), full `QuestionAnswerKey` fields `9..17`, domain/subject metadata on `GetQuestionDetailResponse`, `read_only` mode on `GetMilestoneQuizRequest`, and `passage_title = 8`, `passage_content = 9`, `passage_image_url = 10` on `QuizQuestionItem`. Added `.Include(q => q.Passage)` across all 5 `GetMilestoneQuiz` queries plus `IsBrokenOrphanPassageQuestion` guard to filter out orphan passage-referencing questions lacking a linked `Passage`.
+- **Balanced 30-Question GDPT 2018 Diagnostic Seeder (`DiagnosticExamSeeder.cs`)**: Seeds 3 balanced, non-overlapping 30-question diagnostic suites sourced strictly from real curriculum pattern nodes (`ParentId != null`) covering all 4 domains and all 9 subjects (`Ngữ văn 5`, `Tiếng Anh 5`, `Toán học 8`, `Vật lí 2`, `Hóa học 2`, `Sinh học 2`, `Lịch sử 2`, `Địa lí 2`, `GDKT & Pháp luật 2`) across Bloom levels; safely demotes legacy `11111111-...` to `DIAGNOSTIC_LEGACY` while preserving historical submissions.
+---
+
+## 20. [21/11/2026] SUBJECT BOUNDARY ISOLATION ARCHITECTURE & PLAR CROSS-SUBJECT LEAKAGE PREVENTION
+- **Architectural Rationale**:
+  - In adaptive learning journeys (PLAR Phase A: Apply), a student practicing a designated mathematics milestone (e.g., `Grade 10 Mathematics > Chapter 9: Analytic Geometry > Lesson 2: Lines in the Plane`) must never receive questions from other subjects (such as Vietnamese Literature proverbs or English Grammar).
+  - Previous `GetMilestoneQuiz` implementations contained two severe architectural leaks:
+    1. If `parsedExamId` pointed to a multi-subject diagnostic exam, all questions from that exam (including question 1 literature proverbs) were ingested into the candidate pool without filtering by subject.
+    2. Fallback step 2d queried questions simply by matching `q.Skill.DomainId == targetSkill.DomainId` (mixing English and Vietnamese Literature within `DOM_LANG`, or Physics, Chemistry, and Biology within `DOM_NAT_SCI`), and fallback step 3 indiscriminately selected any question from `_context.Questions` without subject boundary checks.
+- **Architectural Solution & Implementation**:
+  - **Subject Taxonomy Helper (`SubjectTaxonomyHelper.cs`)**:
+    - Centralized domain code mapping (`ResolveDomainCode`) and standardized 9-10 subject taxonomy heuristics (`InferSubjectName`) into `V_Eval_Content_Service.Application.Common.Helpers.SubjectTaxonomyHelper` covering all GDPT 2018 subjects (`Toán học`, `Ngữ văn`, `Tiếng Anh`, `Vật lí`, `Hóa học`, `Sinh học`, `Lịch sử`, `Địa lí`, `GDKT & Pháp luật`, `Tư duy Logic & Số liệu`).
+  - **Strict Subject Boundary Isolation in `GetMilestoneQuiz` ([`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
+    - When `parsedSkillId` is specified, the service determines `targetSubject` and pre-computes `sameSubjectSkillIds` across the curriculum tree.
+    - If `parsedExamId` is provided, questions from `ExamQuestions` are **strictly filtered** to admit only those belonging to `sameSubjectSkillIds`, eliminating cross-subject contamination.
+    - Question retrieval strictly adheres to a 3-tier hierarchical ladder:
+      - *Tier 1 (Exact Skill & Descendants)*: Target pattern and direct child/grandchild skills.
+      - *Tier 2 (Same Chapter)*: Sibling patterns within the same chapter and subject.
+      - *Tier 3 (Same Subject)*: Sibling chapters and patterns across the exact same subject.
+    - **Completely removed** generic domain-level and table-wide fallbacks. If the question bank contains `N < count` questions for that subject, it cleanly returns `N` subject-pure questions rather than contaminating the pool with unrelated subjects.
+- **Verification & Acceptance**:
+  - Automated unit tests in `ContentGrpcServiceSubjectIsolationTests.cs` verify strict isolation between Mathematics, Literature, English, Chemistry, and other disciplines.
+  - `dotnet build --no-restore`: 0 Warnings, 0 Errors.
+  - `dotnet test --no-restore`: **16/16 Passed 100%**.

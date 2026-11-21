@@ -1,7 +1,29 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
-## [20/11/2026] - Liên Kết Trực Tiếp Câu Hỏi Đề Thi Vào Cây Node Khung Chương Trình (`SkillId` Binding) & Truy Xuất Phả Hệ 4 Tầng (`Domain -> Chapter -> Lesson -> Pattern`)
+## [21/11/2026] - Hotfix Phân Lập Biên Giới Môn Học (Subject Boundary Isolation), Tách `SubjectTaxonomyHelper` & Xóa Bỏ Hoàn Toàn Rò Rỉ Câu Hỏi Chéo Môn Trong Chu Trình PLAR
 
+- **Khắc Phục Lỗi Rò Rỉ Chéo Môn Học (Cross-Subject Leakage)**:
+  - Sửa dứt điểm tình trạng học sinh học chuyên đề Toán học (ví dụ: `Toán - Lớp 10`, `Chương 9: Phương pháp toạ độ trong mặt phẳng > Bài 2: Đường thẳng trong mặt phẳng toạ độ`) nhưng lại bị cấp phát câu hỏi môn Ngữ văn/Tục ngữ ("Trăng quầng thì hạn, trăng... thì mưa").
+- **Đóng Gói Bộ Trợ Thủ Phân Loại Môn Học (`SubjectTaxonomyHelper.cs`)**:
+  - Tách các hàm `ResolveDomainCode` và `InferSubjectName` ra lớp tiện ích dùng chung trong tầng Application (`V_Eval_Content_Service.Application.Common.Helpers.SubjectTaxonomyHelper`), hỗ trợ đầy đủ 9–10 môn GDPT 2018 (Toán học, Ngữ văn, Tiếng Anh, Vật lí, Hóa học, Sinh học, Lịch sử, Địa lí, GDKT & Pháp luật, Tư duy Logic & Số liệu).
+- **Tái Cấu Trúc gRPC `GetMilestoneQuiz` ([`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
+  - Áp dụng nguyên tắc **Subject Boundary Isolation**: Khi có `parsedSkillId`, xác định chính xác môn học mục tiêu `targetSubject` và tập hợp `sameSubjectSkillIds`.
+  - Nếu có `parsedExamId`, bắt buộc lọc chỉ giữ lại những câu hỏi của đề thi đó **thuộc cùng môn học** (`sameSubjectSkillIds`), loại bỏ triệt để các câu hỏi khác môn trong đề thi tổng hợp.
+  - Triển khai 3 tầng ưu tiên chuẩn: Tầng 1 (Đúng dạng bài `directAndChildIds`) -> Tầng 2 (Cùng Chương `chapterSkillIds` thuộc môn) -> Tầng 3 (Mở rộng trong cùng môn học `sameSubjectSkillIds`).
+  - **Xóa bỏ hoàn toàn** bước fallback theo `DomainId` chung (dẫn đến lấy chéo giữa Ngữ văn và Tiếng Anh, hoặc giữa Lý, Hóa, Sinh) và bước fallback bừa bãi toàn bộ bảng `Questions`.
+- **Kiểm Thử & Nghiệm Thu**:
+  - Bổ sung file test `ContentGrpcServiceSubjectIsolationTests.cs` kiểm chứng phân lập môn học và miền năng lực.
+  - `dotnet build --no-restore`: Thành công 100% (0 lỗi).
+  - `dotnet test --no-restore`: **16/16 Passed 100%**.
+
+---
+
+## [20/11/2026] - Đồng Bộ `content.proto`, Trả Ngữ Cảnh Đọc Hiểu `Passage` Cho PLAR, Chuẩn Hóa 3 Bộ Đề Test Đầu Vào 30 Câu Khớp 9 Môn GDPT 2018 & Gắn Kết Cây Node 4 Tầng
+
+- **Đồng Bộ `content.proto`, Trả Ngữ Cảnh `Passage` Cho PLAR & Nâng Cấp `ContentGrpcService` ([`content.proto`](../V-Eval-Content_Service.API/Protos/content.proto), [`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
+  - Bổ sung trọn vẹn metadata phân cấp (`parent_id`, `level`, `chapter_name`, `lesson_name`, `subject_name`, `material_id`, `video_url`, `question_count`) cho `GetSkillsTree`, đồng bộ field `9..17` cho `GetExamAnswerKey`, bổ sung `domain_code`/`subject_name` cho `GetQuestionDetail`, triển khai `GetQuestionsByDifficulty`, hỗ trợ `read_only = true` cho `GetMilestoneQuiz` chống sinh `MockExam` rác vào DB, bổ sung `passage_title`/`passage_content`/`passage_image_url` (`8..10`) vào `QuizQuestionItem` kèm `.Include(q => q.Passage)` và lọc bỏ câu hỏi đọc hiểu mồ côi thiếu `Passage` (`IsBrokenOrphanPassageQuestion`).
+- **3 Bộ Đề Diagnostic 30 Câu Cân Bằng Đủ 4 Miền / 9 Môn GDPT 2018 ([`DiagnosticExamSeeder.cs`](../V-Eval-Content_Service.Infrastructure/Persistence/Seeds/DiagnosticExamSeeder.cs), [`GetDiagnosticTestQuery.cs`](../V-Eval-Content_Service.Application/Diagnostic/Queries/GetDiagnosticTest/GetDiagnosticTestQuery.cs), [`DiagnosticController.cs`](../V-Eval-Content_Service.API/Controllers/DiagnosticController.cs))**:
+  - Tự động gieo 3 bộ đề chẩn đoán 30 câu cân bằng đúng tỷ lệ V-ACT từ 337 dạng bài SGK thật (Ngữ văn 5, Tiếng Anh 5, Toán 8, Vật lí 2, Hóa học 2, Sinh học 2, Lịch sử 2, Địa lí 2, GDKT & PL 2), hỗ trợ loại trừ nhiều đề đã làm (`excludeExamIds`) và trả đủ `skillId`, `domainCode`, `subjectName`, `chapterName`, `lessonName`.
 - **Gắn Trực Tiếp `SkillId` Của Cây Khung Chương Trình Khi Import Đề Thi ([`ImportMockExamCommand.cs`](../V-Eval-Content_Service.Application/MockExams/Commands/ImportMockExam/ImportMockExamCommand.cs), [`ImportMockExamCommandHandler.cs`](../V-Eval-Content_Service.Application/MockExams/Commands/ImportMockExam/ImportMockExamCommandHandler.cs))**:
   - Mở rộng `QuestionDto` bổ sung các trường liên kết cây Node: `SkillId` (`Guid?`), `DomainName`, `ChapterName`, `LessonName`.
   - Tối ưu hóa `ImportMockExamCommandHandler`: Nạp sẵn danh sách `Skills` và `CompetencyDomains` 1 lần (triệt tiêu N+1 query cho đề 120 câu); triển khai hàm `ResolveOrCreateSkillIdAsync` theo 3 tầng ưu tiên: (1) Gắn trực tiếp vào `SkillId` hợp lệ nếu đã tồn tại trên cây; (2) Ưu tiên khớp tên trên các nút thuộc cây phân cấp (`ParentId != null`: Dạng bài / Bài học / Chương) tránh tạo Skill mồ côi rác; (3) Chỉ khởi tạo Skill mới khi hoàn toàn chưa có nút phù hợp.
