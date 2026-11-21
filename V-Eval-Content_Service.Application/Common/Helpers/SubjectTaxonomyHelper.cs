@@ -61,5 +61,45 @@ public static class SubjectTaxonomyHelper
             _ => "Toán học"
         };
     }
+
+    /// <summary>
+    /// Phát hiện câu hỏi Tiếng Anh bị gán nhầm vào kỹ năng của môn khác trong CSDL (vd: câu ngữ pháp tiếng Anh nằm trong kỹ năng Hóa học).
+    /// </summary>
+    public static bool IsContentLanguageMismatch(string? contentLatex, string targetSubject)
+    {
+        if (string.IsNullOrWhiteSpace(contentLatex)) return false;
+        if (string.Equals(targetSubject, "Tiếng Anh", StringComparison.OrdinalIgnoreCase)) return false;
+
+        // Nếu chứa bất kỳ ký tự có dấu tiếng Việt nào -> chắc chắn là nội dung tiếng Việt, không phải câu Tiếng Anh thuần
+        foreach (char c in contentLatex)
+        {
+            if ("àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ".IndexOf(c) >= 0)
+            {
+                return false;
+            }
+        }
+
+        var lower = $" {contentLatex.ToLowerInvariant()} ";
+        string[] englishMarkers =
+        {
+            " the ", " is ", " are ", " was ", " were ", " than ", " should ", " would ", " could ",
+            " which ", " what ", " where ", " when ", " does ", " have ", " has ", " had ",
+            " you ", " your ", " they ", " their ", " because ", " although ", " however ",
+            " yesterday", " tomorrow", " today ", " weather ", " sentence", " underlined ", " closest in meaning",
+            " opposite in meaning", " choose the ", " best completes "
+        };
+
+        int hits = 0;
+        foreach (var marker in englishMarkers)
+        {
+            if (lower.Contains(marker, StringComparison.Ordinal))
+            {
+                hits++;
+                if (hits >= 2) return true;
+            }
+        }
+
+        return false;
+    }
 }
 

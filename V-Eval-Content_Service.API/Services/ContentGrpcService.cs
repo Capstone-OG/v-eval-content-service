@@ -111,10 +111,21 @@ public class ContentGrpcService : ContentService.ContentServiceBase
             var subjectName = InferSubjectName(chapterName, s.Name, domainCode);
 
             materialsBySkill.TryGetValue(s.SkillId, out var mat);
-            // If pattern has no direct material, inherit parent lesson's material
+            // If pattern has no direct material, inherit parent lesson's material or a sibling pattern's material in the same lesson
             if (mat == null && s.ParentId.HasValue)
             {
                 materialsBySkill.TryGetValue(s.ParentId.Value, out mat);
+                if (mat == null)
+                {
+                    var siblingId = skills
+                        .Where(sib => sib.ParentId == s.ParentId && sib.SkillId != s.SkillId && materialsBySkill.ContainsKey(sib.SkillId))
+                        .Select(sib => sib.SkillId)
+                        .FirstOrDefault();
+                    if (siblingId != Guid.Empty)
+                    {
+                        materialsBySkill.TryGetValue(siblingId, out mat);
+                    }
+                }
             }
 
             questionCountsBySkill.TryGetValue(s.SkillId, out var qCount);
@@ -375,12 +386,17 @@ public class ContentGrpcService : ContentService.ContentServiceBase
                 || text.Contains("ngữ liệu trên") || text.Contains("thông tin trên") || text.Contains("đoạn trích trên");
         }
 
-        void AppendUnique(IEnumerable<Question> items)
+        void AppendUnique(IEnumerable<Question> items, string? requiredSubject = null)
         {
             foreach (var q in items)
             {
                 if (questionsList.Count >= count) break;
                 if (IsBrokenOrphanPassageQuestion(q)) continue;
+                if (!string.IsNullOrEmpty(requiredSubject)
+                    && SubjectTaxonomyHelper.IsContentLanguageMismatch(q.ContentLatex, requiredSubject))
+                {
+                    continue;
+                }
                 if (seenIds.Add(q.QuestionId))
                 {
                     questionsList.Add(q);
@@ -432,7 +448,7 @@ public class ContentGrpcService : ContentService.ContentServiceBase
                         var sameSubjectExamQuestions = examQuestions
                             .Where(eq => sameSubjectSkillIds.Contains(eq.Question.SkillId))
                             .Select(eq => eq.Question);
-                        AppendUnique(sameSubjectExamQuestions);
+                        AppendUnique(sameSubjectExamQuestions, targetSubject);
 
                         var exam = await _context.MockExams
                             .AsNoTracking()
@@ -463,7 +479,7 @@ public class ContentGrpcService : ContentService.ContentServiceBase
                         .ThenBy(q => q.CreatedAt)
                         .Take((count - questionsList.Count) * 2)
                         .ToListAsync(context.CancellationToken);
-                    AppendUnique(directQuestions);
+                    AppendUnique(directQuestions, targetSubject);
                 }
 
                 // 1c. Ưu tiên 2: Cùng Chương (sibling patterns/lessons trong cùng chapter của môn học)
@@ -492,12 +508,13 @@ public class ContentGrpcService : ContentService.ContentServiceBase
                             .OrderBy(q => q.DifficultyLevel)
                             .Take((count - questionsList.Count) * 2)
                             .ToListAsync(context.CancellationToken);
-                        AppendUnique(chapterQuestions);
+                        AppendUnique(chapterQuestions, targetSubject);
                     }
                 }
 
-                // 1d. Ưu tiên 3: Mở rộng trong CÙNG MÔN HỌC (đảm bảo đủ dải Bloom L1-L4 cho ZPD nhưng TUYỆT ĐỐI KHÔNG LẪN MÔN KHÁC)
-                if (questionsList.Count < count)
+                // 1d. Ưu tiên 3 (Chỉ chạy khi cả Dạng bài lẫn Chương hiện tại đều có 0 câu hỏi):
+                // Nếu đã có ít nhất 1 câu đúng dạng bài/cùng chương -> KHÔNG kéo câu hỏi từ chương khác (tránh Tổ hợp xác suất bị dính Độ dài đường thẳng!)
+                if (questionsList.Count == 0)
                 {
                     var sameSubjectQuestions = await _context.Questions
                         .AsNoTracking()
@@ -505,9 +522,9 @@ public class ContentGrpcService : ContentService.ContentServiceBase
                         .Include(q => q.Skill)
                         .Where(q => sameSubjectSkillIds.Contains(q.SkillId) && !seenIds.Contains(q.QuestionId))
                         .OrderBy(q => q.DifficultyLevel)
-                        .Take((count - questionsList.Count) * 2)
+                        .Take(Math.Min(count, 5) * 3)
                         .ToListAsync(context.CancellationToken);
-                    AppendUnique(sameSubjectQuestions);
+                    AppendUnique(sameSubjectQuestions, targetSubject);
                 }
 
                 // TUYỆT ĐỐI KHÔNG CÓ BƯỚC 2d (same domain) HAY BƯỚC 3 (fallback toàn bộ bảng questions)!
