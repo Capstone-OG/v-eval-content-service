@@ -1,5 +1,11 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [23/11/2026] - Chống Trùng Lặp Theo Nội Dung & Xáo Trộn Ngẫu Nhiên Trong `GetMilestoneQuiz`
+
+- **Chống Trùng Nội Dung & Đa Dạng Hóa Câu Hỏi ([`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
+  - Bổ sung tập lọc `seenContents` (chuẩn hóa khoảng trắng và không phân biệt hoa thường trên `ContentLatex`) trong `AppendUnique` để chặn tuyệt đối việc chọn 2 câu giống hệt nội dung nhưng khác `QuestionId`.
+  - Bổ sung xáo trộn ngẫu nhiên (`Random.Shared.Next()`) trước khi rút câu hỏi thay vì lấy cố định theo thứ tự CSDL.
+
 ## [22/11/2026] - Chặn Câu Hỏi Tiếng Anh Gán Nhầm Môn & Siết Chặt Biên Giới Chương Trong `GetMilestoneQuiz` PLAR
 
 - **Bộ Lọc Ngôn Ngữ Chống Lọt Câu Tiếng Anh ([`SubjectTaxonomyHelper.cs`](../V-Eval-Content_Service.Application/Common/Helpers/SubjectTaxonomyHelper.cs), [`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
