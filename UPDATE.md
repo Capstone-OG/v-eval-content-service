@@ -1,7 +1,7 @@
-# UPDATE - CONTENT SERVICE
+# V-Eval Content Service — Cập Nhật Tiến Độ
 
-## [22/11/2026]
-- **Siết Chặt Khớp Chương / Dạng Bài & Chặn Câu Hỏi Tiếng Anh Bị Gán Nhầm Môn Trong Chu Trình PLAR (`SubjectTaxonomyHelper.cs`, `ContentGrpcService.cs`, `ContentGrpcServiceSubjectIsolationTests.cs`)**:
-  - Bổ sung bộ lọc ngôn ngữ `SubjectTaxonomyHelper.IsContentLanguageMismatch`: tự động loại bỏ các câu hỏi Tiếng Anh thuần (không có dấu tiếng Việt và chứa cấu trúc câu Tiếng Anh) bị gán nhầm vào kỹ năng các môn khác trong CSDL (như Hóa học, Toán học, Vật lí).
-  - Siết chặt bước mở rộng `1d` trong `ContentGrpcService.GetMilestoneQuiz`: khi dạng bài hoặc chương hiện tại đã có ít nhất 1 câu hỏi hợp lệ, **dừng ngay việc kéo câu hỏi từ các chương khác** (khắc phục triệt để lỗi học *Tổ hợp - Xác suất* bị kéo câu hỏi *Độ dài đường thẳng*).
-  - Bổ sung unit test kiểm chứng bộ lọc ngôn ngữ; `dotnet test --no-restore` đạt **18/18 Passed (100%)**.
+## [23/11/2026] - Chống Trùng Lặp Nội Dung & Xáo Trộn Câu Hỏi Trong `GetMilestoneQuiz`
+
+- **Cải Tiến Bộ Chọn Câu Hỏi gRPC ([`ContentGrpcService.cs`](./V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
+  - Bổ sung `seenContents` chuẩn hóa khoảng trắng để lọc trùng lặp theo nội dung (`ContentLatex`), ngăn tuyệt đối 2 câu hỏi giống hệt nhau (khác `QuestionId`) xuất hiện trong cùng 1 bài Preview/Quiz.
+  - Xáo trộn ngẫu nhiên (`OrderBy(_ => Random.Shared.Next())`) trước khi chọn câu hỏi trong `AppendUnique`, khắc phục tình trạng học sinh lặp lại liên tục các câu đầu tiên trong CSDL.
