@@ -1,7 +1,9 @@
-# UPDATE - CONTENT SERVICE
+# UPDATE — V-Eval-Content_Service
 
-## [22/11/2026]
-- **Siết Chặt Khớp Chương / Dạng Bài & Chặn Câu Hỏi Tiếng Anh Bị Gán Nhầm Môn Trong Chu Trình PLAR (`SubjectTaxonomyHelper.cs`, `ContentGrpcService.cs`, `ContentGrpcServiceSubjectIsolationTests.cs`)**:
-  - Bổ sung bộ lọc ngôn ngữ `SubjectTaxonomyHelper.IsContentLanguageMismatch`: tự động loại bỏ các câu hỏi Tiếng Anh thuần (không có dấu tiếng Việt và chứa cấu trúc câu Tiếng Anh) bị gán nhầm vào kỹ năng các môn khác trong CSDL (như Hóa học, Toán học, Vật lí).
-  - Siết chặt bước mở rộng `1d` trong `ContentGrpcService.GetMilestoneQuiz`: khi dạng bài hoặc chương hiện tại đã có ít nhất 1 câu hỏi hợp lệ, **dừng ngay việc kéo câu hỏi từ các chương khác** (khắc phục triệt để lỗi học *Tổ hợp - Xác suất* bị kéo câu hỏi *Độ dài đường thẳng*).
-  - Bổ sung unit test kiểm chứng bộ lọc ngôn ngữ; `dotnet test --no-restore` đạt **18/18 Passed (100%)**.
+## [23/11/2026]
+- **Tích Hợp Continuous Deployment (Auto-CD) Lên Máy Chủ Ubuntu Docker Server (`veval.io.vn`)**:
+  - Bổ sung file workflow [`.github/workflows/cd-main.yml`](./.github/workflows/cd-main.yml) kích hoạt tự động mỗi khi có Pull Request được merge vào nhánh `main`.
+  - Cấu hình 2 job tuần tự:
+    1. **`ci-verify` (`runs-on: ubuntu-latest`)**: Chạy kiểm tra lint, build và automated tests trên hạ tầng GitHub Cloud.
+    2. **`deploy-ubuntu` (`runs-on: [self-hosted, veval-prod]`)**: Gọi script `/data/Capstone/Scripts/deploy_service.sh content` trên máy chủ Ubuntu production.
+  - Áp dụng cơ chế selective rebuild (`--no-deps`), đồng bộ Git hard reset nhánh `main` và bảo toàn kết nối Zero-Downtime của Cloudflare Tunnel.
