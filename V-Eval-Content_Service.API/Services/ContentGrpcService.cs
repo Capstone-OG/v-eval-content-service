@@ -374,6 +374,7 @@ public class ContentGrpcService : ContentService.ContentServiceBase
 
         var questionsList = new List<Question>();
         var seenIds = new HashSet<Guid>();
+        var seenContents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         string title = "Bài Quiz củng cố chặng học";
         Guid finalExamId = parsedExamId ?? Guid.NewGuid();
 
@@ -388,7 +389,7 @@ public class ContentGrpcService : ContentService.ContentServiceBase
 
         void AppendUnique(IEnumerable<Question> items, string? requiredSubject = null)
         {
-            foreach (var q in items)
+            foreach (var q in items.OrderBy(_ => Random.Shared.Next()))
             {
                 if (questionsList.Count >= count) break;
                 if (IsBrokenOrphanPassageQuestion(q)) continue;
@@ -397,7 +398,12 @@ public class ContentGrpcService : ContentService.ContentServiceBase
                 {
                     continue;
                 }
-                if (seenIds.Add(q.QuestionId))
+                string normalizedContent = System.Text.RegularExpressions.Regex.Replace(
+                    (q.ContentLatex ?? string.Empty).Trim(),
+                    @"\s+",
+                    " ");
+                if (string.IsNullOrEmpty(normalizedContent)) continue;
+                if (seenIds.Add(q.QuestionId) && seenContents.Add(normalizedContent))
                 {
                     questionsList.Add(q);
                 }
