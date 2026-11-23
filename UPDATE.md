@@ -1,7 +1,9 @@
-# V-Eval Content Service — Cập Nhật Tiến Độ
+# UPDATE — V-Eval-Content_Service
 
-## [23/11/2026] - Chống Trùng Lặp Nội Dung & Xáo Trộn Câu Hỏi Trong `GetMilestoneQuiz`
-
-- **Cải Tiến Bộ Chọn Câu Hỏi gRPC ([`ContentGrpcService.cs`](./V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
-  - Bổ sung `seenContents` chuẩn hóa khoảng trắng để lọc trùng lặp theo nội dung (`ContentLatex`), ngăn tuyệt đối 2 câu hỏi giống hệt nhau (khác `QuestionId`) xuất hiện trong cùng 1 bài Preview/Quiz.
-  - Xáo trộn ngẫu nhiên (`OrderBy(_ => Random.Shared.Next())`) trước khi chọn câu hỏi trong `AppendUnique`, khắc phục tình trạng học sinh lặp lại liên tục các câu đầu tiên trong CSDL.
+## [23/11/2026]
+- **Tích Hợp Continuous Deployment (Auto-CD) Lên Máy Chủ Ubuntu Docker Server (`veval.io.vn`)**:
+  - Bổ sung file workflow [`.github/workflows/cd-main.yml`](./.github/workflows/cd-main.yml) kích hoạt tự động mỗi khi có Pull Request được merge vào nhánh `main`.
+  - Cấu hình 2 job tuần tự:
+    1. **`ci-verify` (`runs-on: ubuntu-latest`)**: Chạy kiểm tra lint, build và automated tests trên hạ tầng GitHub Cloud.
+    2. **`deploy-ubuntu` (`runs-on: [self-hosted, veval-prod]`)**: Gọi script `/data/Capstone/Scripts/deploy_service.sh content` trên máy chủ Ubuntu production.
+  - Áp dụng cơ chế selective rebuild (`--no-deps`), đồng bộ Git hard reset nhánh `main` và bảo toàn kết nối Zero-Downtime của Cloudflare Tunnel.
