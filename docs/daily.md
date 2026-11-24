@@ -511,3 +511,10 @@
 - **Khởi tạo 4 Layer Clean Architecture**: Tách bạch `Domain`, `Application`, `Infrastructure`, `API`.
 - **Xây dựng Domain Entities & EF Core Npgsql**: Tạo `ContentDbContext`, ánh xạ Fluent API vào schema `content` trên Supabase.
 - **Thiết kế Command CQRS MediatR**: Triển khai `CreateMockExamCommand` và `CreateMockExamCommandHandler` tự động sinh `Skill`.
+
+## [24/11/2026]
+- Bổ sung bộ lọc `HasBrokenOrMissingOptions` tại `ContentGrpcService.cs` (`GetMilestoneQuiz`) để tự động chặn không phát các câu hỏi thiếu đáp án hoặc có đáp án placeholder (`...`) cho học sinh.
+
+### [24/11/2026 - Cập nhật chiều] Khóa & Mở khóa câu hỏi bị gắn cờ trực tiếp trên CSDL
+- Bổ sung `IsFlagged`, `FlagReason`, `FlaggedAt` trong `Question.cs`, `ContentDbContext.cs` & auto `ALTER TABLE` tại `Program.cs`.
+- Bổ sung API `/api/content/questions/flagged`, `/flag`, `/unflag` trong `QuestionsController.cs` và lọc `!q.IsFlagged` tại `ContentGrpcService.cs` & `GetQuestionsBySkillQueryHandler.cs`.

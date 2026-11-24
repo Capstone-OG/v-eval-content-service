@@ -116,8 +116,12 @@ using (var scope = app.Services.CreateScope())
         var dbContext = services.GetRequiredService<ContentDbContext>();
         try
         {
-            await dbContext.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE v_eval_content.\"Materials\" ADD COLUMN IF NOT EXISTS duration_seconds INT DEFAULT 0;");
+            await dbContext.Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE v_eval_content.""Materials"" ADD COLUMN IF NOT EXISTS duration_seconds INT DEFAULT 0;
+                ALTER TABLE v_eval_content.""Questions"" ADD COLUMN IF NOT EXISTS is_flagged BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE v_eval_content.""Questions"" ADD COLUMN IF NOT EXISTS flag_reason TEXT;
+                ALTER TABLE v_eval_content.""Questions"" ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMP WITH TIME ZONE;
+            ");
         }
         catch (Exception ex)
         {
