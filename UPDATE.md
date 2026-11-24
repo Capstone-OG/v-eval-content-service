@@ -1,9 +1,6 @@
-# UPDATE — V-Eval-Content_Service
+# [24/11/2026]
 
-## [23/11/2026]
-- **Tích Hợp Continuous Deployment (Auto-CD) Lên Máy Chủ Ubuntu Docker Server (`veval.io.vn`)**:
-  - Bổ sung file workflow [`.github/workflows/cd-main.yml`](./.github/workflows/cd-main.yml) kích hoạt tự động mỗi khi có Pull Request được merge vào nhánh `main`.
-  - Cấu hình 2 job tuần tự:
-    1. **`ci-verify` (`runs-on: ubuntu-latest`)**: Chạy kiểm tra lint, build và automated tests trên hạ tầng GitHub Cloud.
-    2. **`deploy-ubuntu` (`runs-on: [self-hosted, veval-prod]`)**: Gọi script `/data/Capstone/Scripts/deploy_service.sh content` trên máy chủ Ubuntu production.
-  - Áp dụng cơ chế selective rebuild (`--no-deps`), đồng bộ Git hard reset nhánh `main` và bảo toàn kết nối Zero-Downtime của Cloudflare Tunnel.
+- Fixed intermittent HTTP 500 on `GET /api/content/curriculum` caused by 3-way Cartesian Explosion across 1,800+ skills: enabled `QuerySplittingBehavior.SplitQuery` and `EnableRetryOnFailure(3, 3s)` on `ContentDbContext` in `Program.cs`.
+- Added thread-safe 5-minute `IMemoryCache` (`SemaphoreSlim` stampede guard) in `CurriculumController.cs` with automatic cache invalidation on `ImportCurriculum`, `UpdatePattern`, `UpdateNode`, `CreateNode`, and `DeleteNode`.
+- Raised gRPC server `MaxSendMessageSize` and `MaxReceiveMessageSize` to `32 MB` so full skill-tree gRPC responses never hit the 4 MB default ceiling.
+- Verified with `dotnet build` (0 errors).

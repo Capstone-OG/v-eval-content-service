@@ -377,3 +377,7 @@ To avoid architectural ambiguity, the system establishes a clear dual ingestion 
   1. Added `SubjectTaxonomyHelper.IsContentLanguageMismatch` to filter out misclassified pure-English items stored under non-English skills (e.g., Chemistry).
   2. Restricted same-subject expansion (`Step 1d`) to trigger only when `questionsList.Count == 0`, preventing cross-chapter pollution (e.g., geometry questions leaking into combinatorics milestones).
   3. **Verification**: `dotnet test --no-restore` passed **18/18** unit tests.
+
+## [24/11/2026] Curriculum Query Optimization & gRPC Message Ceiling Upgrade
+- Configured `QuerySplittingBehavior.SplitQuery` and `EnableRetryOnFailure(3, 3s)` on `ContentDbContext` to prevent Cartesian Explosion and transient pooler 500 errors on `/api/content/curriculum`.
+- Introduced `IMemoryCache` with `SemaphoreSlim` lock in `CurriculumController` (5-minute TTL, auto-evicted on curriculum mutations) and raised gRPC server message limits to 32 MB.

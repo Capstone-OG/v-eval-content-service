@@ -511,3 +511,8 @@
 - **Khởi tạo 4 Layer Clean Architecture**: Tách bạch `Domain`, `Application`, `Infrastructure`, `API`.
 - **Xây dựng Domain Entities & EF Core Npgsql**: Tạo `ContentDbContext`, ánh xạ Fluent API vào schema `content` trên Supabase.
 - **Thiết kế Command CQRS MediatR**: Triển khai `CreateMockExamCommand` và `CreateMockExamCommandHandler` tự động sinh `Skill`.
+
+## [24/11/2026]
+- Fixed intermittent HTTP 500 on `GET /api/content/curriculum` by enabling `QuerySplittingBehavior.SplitQuery` + `EnableRetryOnFailure` on `ContentDbContext` and adding 5-minute `IMemoryCache` with write invalidation in `CurriculumController`.
+- Increased gRPC server message size limits (`MaxSendMessageSize` / `MaxReceiveMessageSize`) to 32 MB to support the full 1,877-skill tree.
+- Verified build: `dotnet build` passed with 0 errors.
