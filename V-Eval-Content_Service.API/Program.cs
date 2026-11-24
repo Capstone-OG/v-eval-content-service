@@ -50,10 +50,17 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// 3. Cấu hình kết nối PostgreSQL Supabase (Schema content)
+// 3. Cấu hình kết nối PostgreSQL Supabase (Schema content) kèm Retry & SplitQuery chống Cartesian Explosion
 builder.Services.AddDbContext<ContentDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
-        b => b.MigrationsAssembly(typeof(ContentDbContext).Assembly.FullName)));
+        b =>
+        {
+            b.MigrationsAssembly(typeof(ContentDbContext).Assembly.FullName);
+            b.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+            b.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(3), errorCodesToAdd: null);
+        }));
+
+builder.Services.AddMemoryCache();
 
 // 4. Đăng ký Dependency Injection cho IContentDbContext
 builder.Services.AddScoped<IContentDbContext>(provider => provider.GetRequiredService<ContentDbContext>());
@@ -68,8 +75,12 @@ builder.Services.AddMediatR(cfg =>
     cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
 });
 
-// 7. Cấu hình gRPC Server
-builder.Services.AddGrpc();
+// 7. Cấu hình gRPC Server (nâng trần message lên 32MB cho cây kỹ năng đầy đủ)
+builder.Services.AddGrpc(options =>
+{
+    options.MaxSendMessageSize = 32 * 1024 * 1024;
+    options.MaxReceiveMessageSize = 32 * 1024 * 1024;
+});
 
 // 8. Cấu hình CORS
 builder.Services.AddCors(options =>
@@ -116,8 +127,12 @@ using (var scope = app.Services.CreateScope())
         var dbContext = services.GetRequiredService<ContentDbContext>();
         try
         {
-            await dbContext.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE v_eval_content.\"Materials\" ADD COLUMN IF NOT EXISTS duration_seconds INT DEFAULT 0;");
+            await dbContext.Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE v_eval_content.""Materials"" ADD COLUMN IF NOT EXISTS duration_seconds INT DEFAULT 0;
+                ALTER TABLE v_eval_content.""Questions"" ADD COLUMN IF NOT EXISTS is_flagged BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE v_eval_content.""Questions"" ADD COLUMN IF NOT EXISTS flag_reason TEXT;
+                ALTER TABLE v_eval_content.""Questions"" ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMP WITH TIME ZONE;
+            ");
         }
         catch (Exception ex)
         {

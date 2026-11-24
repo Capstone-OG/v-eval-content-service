@@ -378,6 +378,32 @@ public class ContentGrpcService : ContentService.ContentServiceBase
         string title = "Bài Quiz củng cố chặng học";
         Guid finalExamId = parsedExamId ?? Guid.NewGuid();
 
+        static bool IsBrokenOptionText(string? opt)
+        {
+            var trimmed = (opt ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(trimmed)) return true;
+            if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^[\.\u2026\-_\s\?]+$")) return true;
+            var lower = trimmed.ToLowerInvariant();
+            return lower == "n/a" || lower == "tbd" || lower == "null" || lower == "undefined" || lower == "chưa có";
+        }
+
+        static bool HasBrokenOrMissingOptions(Question q)
+        {
+            var opts = new[] { q.OptionA, q.OptionB, q.OptionC, q.OptionD };
+            if (opts.Any(IsBrokenOptionText)) return true;
+
+            var distinctValid = opts
+                .Select(o => System.Text.RegularExpressions.Regex.Replace((o ?? string.Empty).Trim(), @"\s+", " "))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+            if (distinctValid < 2) return true;
+
+            var corr = char.ToUpperInvariant(q.CorrectOption);
+            if (corr != 'A' && corr != 'B' && corr != 'C' && corr != 'D') return true;
+
+            return false;
+        }
+
         static bool IsBrokenOrphanPassageQuestion(Question q)
         {
             if (q.Passage != null && !string.IsNullOrWhiteSpace(q.Passage.Content)) return false;
@@ -392,6 +418,8 @@ public class ContentGrpcService : ContentService.ContentServiceBase
             foreach (var q in items.OrderBy(_ => Random.Shared.Next()))
             {
                 if (questionsList.Count >= count) break;
+                if (q.IsFlagged) continue;
+                if (HasBrokenOrMissingOptions(q)) continue;
                 if (IsBrokenOrphanPassageQuestion(q)) continue;
                 if (!string.IsNullOrEmpty(requiredSubject)
                     && SubjectTaxonomyHelper.IsContentLanguageMismatch(q.ContentLatex, requiredSubject))
