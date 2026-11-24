@@ -1,8 +1,12 @@
+using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using V_Eval_Content_Service.API.Controllers.Base;
+using V_Eval_Content_Service.Application.Common.Models;
 using V_Eval_Content_Service.Application.Curriculum.Commands.ImportCurriculum;
 using V_Eval_Content_Service.Application.Curriculum.DTOs;
 using V_Eval_Content_Service.Application.Curriculum.Queries.GetCurriculumTree;
@@ -15,6 +19,15 @@ namespace V_Eval_Content_Service.API.Controllers;
 [Route("api/content/curriculum")]
 public class CurriculumController : ApiControllerBase
 {
+    private const string CurriculumTreeCacheKey = "content:curriculum:tree:v1";
+    private static readonly SemaphoreSlim CurriculumCacheLock = new(1, 1);
+    private readonly IMemoryCache _cache;
+
+    public CurriculumController(IMemoryCache cache)
+    {
+        _cache = cache;
+    }
+
     /// <summary>
     /// Lấy toàn bộ cây dàn kiến thức 4 miền năng lực, chuyên đề, công thức KaTeX và liên kết liên môn từ Database
     /// </summary>
@@ -25,10 +38,35 @@ public class CurriculumController : ApiControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<CurriculumDomainDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetCurriculumTree()
+    public async Task<IActionResult> GetCurriculumTree(CancellationToken cancellationToken)
     {
-        var result = await Mediator.Send(new GetCurriculumTreeQuery());
-        return HandleResult(result);
+        if (_cache.TryGetValue(CurriculumTreeCacheKey, out Result<List<CurriculumDomainDto>>? cached) && cached != null)
+        {
+            return HandleResult(cached);
+        }
+
+        await CurriculumCacheLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_cache.TryGetValue(CurriculumTreeCacheKey, out cached) && cached != null)
+            {
+                return HandleResult(cached);
+            }
+
+            var result = await Mediator.Send(new GetCurriculumTreeQuery(), cancellationToken);
+            if (result.IsSuccess)
+            {
+                _cache.Set(CurriculumTreeCacheKey, result, new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+                });
+            }
+            return HandleResult(result);
+        }
+        finally
+        {
+            CurriculumCacheLock.Release();
+        }
     }
 
     /// <summary>
@@ -45,6 +83,7 @@ public class CurriculumController : ApiControllerBase
     public async Task<IActionResult> ImportCurriculum([FromBody] ImportCurriculumRequestDto dto)
     {
         var result = await Mediator.Send(new ImportCurriculumCommand(dto));
+        if (result.IsSuccess) _cache.Remove(CurriculumTreeCacheKey);
         return HandleResult(result);
     }
 
@@ -62,6 +101,7 @@ public class CurriculumController : ApiControllerBase
     public async Task<IActionResult> UpdatePattern([FromRoute] string id, [FromBody] UpdateCurriculumPatternDto dto)
     {
         var result = await Mediator.Send(new V_Eval_Content_Service.Application.Curriculum.Commands.UpdatePattern.UpdatePatternCommand(id, dto));
+        if (result.IsSuccess) _cache.Remove(CurriculumTreeCacheKey);
         return HandleResult(result);
     }
 
@@ -75,6 +115,7 @@ public class CurriculumController : ApiControllerBase
     public async Task<IActionResult> UpdateNode([FromRoute] System.Guid id, [FromBody] UpdateCurriculumNodeDto dto)
     {
         var result = await Mediator.Send(new V_Eval_Content_Service.Application.Curriculum.Commands.UpdateNode.UpdateNodeCommand(id, dto));
+        if (result.IsSuccess) _cache.Remove(CurriculumTreeCacheKey);
         return HandleResult(result);
     }
 
@@ -87,6 +128,7 @@ public class CurriculumController : ApiControllerBase
     public async Task<IActionResult> CreateNode([FromBody] CreateCurriculumNodeDto dto)
     {
         var result = await Mediator.Send(new V_Eval_Content_Service.Application.Curriculum.Commands.CreateNode.CreateNodeCommand(dto));
+        if (result.IsSuccess) _cache.Remove(CurriculumTreeCacheKey);
         return HandleResult(result);
     }
 
@@ -100,6 +142,7 @@ public class CurriculumController : ApiControllerBase
     public async Task<IActionResult> DeleteNode([FromRoute] string id)
     {
         var result = await Mediator.Send(new V_Eval_Content_Service.Application.Curriculum.Commands.DeleteNode.DeleteNodeCommand(id));
+        if (result.IsSuccess) _cache.Remove(CurriculumTreeCacheKey);
         return HandleResult(result);
     }
 }

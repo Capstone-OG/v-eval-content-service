@@ -29,6 +29,7 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
         CancellationToken cancellationToken)
     {
         // Truy vấn 100% từ Database: CompetencyDomains kèm Skills, Materials, Questions, Prerequisites
+        // (QuerySplittingBehavior.SplitQuery đã được cấu hình tại ContentDbContext)
         var domains = await _context.CompetencyDomains
             .AsNoTracking()
             .Include(d => d.Skills)

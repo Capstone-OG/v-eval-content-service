@@ -82,3 +82,5 @@
 | 48 | **Phân Lập Môn Học Tuyệt Đối (Subject Boundary Isolation), Tách `SubjectTaxonomyHelper` & Triệt Tiêu Rò Rỉ Câu Hỏi Chéo Môn PLAR** | `ContentGrpcService.cs`, `SubjectTaxonomyHelper.cs`, `ContentGrpcServiceSubjectIsolationTests.cs` | 🟢 Hoàn thành | 100% | Thiết lập cơ chế Subject Boundary Isolation trong `GetMilestoneQuiz`: xác định `targetSubject` và lọc sạch câu hỏi khác môn trong đề thi tổng hợp; đóng gói thư viện phân loại `SubjectTaxonomyHelper` hỗ trợ 9–10 môn GDPT 2018; xóa bỏ toàn bộ fallback chéo môn; unit tests đạt 16/16 Passed 100%. |
 
 | 49 | **Siết Chặt Biên Giới Chương & Bộ Lọc Ngôn Ngữ Chống Lọt Câu Tiếng Anh Trong PLAR** | `SubjectTaxonomyHelper.cs`, `ContentGrpcService.cs`, `ContentGrpcServiceSubjectIsolationTests.cs` | 🟢 Hoàn thành | 100% | Bổ sung `IsContentLanguageMismatch` chặn câu hỏi Tiếng Anh gán nhầm môn trong DB; siết bước `1d` chỉ mở rộng toàn môn khi dạng bài & chương có 0 câu hỏi; `dotnet test` 18/18 Passed. |
+
+| [24/11/2026] Curriculum Query Stability & gRPC 32MB | SplitQuery + Npgsql Retry + 5-min IMemoryCache in `CurriculumController` + 32MB gRPC limit | Done (100%) |

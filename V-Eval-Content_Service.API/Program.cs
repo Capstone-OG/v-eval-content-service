@@ -50,10 +50,17 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// 3. Cấu hình kết nối PostgreSQL Supabase (Schema content)
+// 3. Cấu hình kết nối PostgreSQL Supabase (Schema content) kèm Retry & SplitQuery chống Cartesian Explosion
 builder.Services.AddDbContext<ContentDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
-        b => b.MigrationsAssembly(typeof(ContentDbContext).Assembly.FullName)));
+        b =>
+        {
+            b.MigrationsAssembly(typeof(ContentDbContext).Assembly.FullName);
+            b.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+            b.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(3), errorCodesToAdd: null);
+        }));
+
+builder.Services.AddMemoryCache();
 
 // 4. Đăng ký Dependency Injection cho IContentDbContext
 builder.Services.AddScoped<IContentDbContext>(provider => provider.GetRequiredService<ContentDbContext>());
@@ -68,8 +75,12 @@ builder.Services.AddMediatR(cfg =>
     cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
 });
 
-// 7. Cấu hình gRPC Server
-builder.Services.AddGrpc();
+// 7. Cấu hình gRPC Server (nâng trần message lên 32MB cho cây kỹ năng đầy đủ)
+builder.Services.AddGrpc(options =>
+{
+    options.MaxSendMessageSize = 32 * 1024 * 1024;
+    options.MaxReceiveMessageSize = 32 * 1024 * 1024;
+});
 
 // 8. Cấu hình CORS
 builder.Services.AddCors(options =>
