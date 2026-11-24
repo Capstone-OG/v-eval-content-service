@@ -515,4 +515,8 @@
 ## [24/11/2026]
 - Fixed intermittent HTTP 500 on `GET /api/content/curriculum` by enabling `QuerySplittingBehavior.SplitQuery` + `EnableRetryOnFailure` on `ContentDbContext` and adding 5-minute `IMemoryCache` with write invalidation in `CurriculumController`.
 - Increased gRPC server message size limits (`MaxSendMessageSize` / `MaxReceiveMessageSize`) to 32 MB to support the full 1,877-skill tree.
-- Verified build: `dotnet build` passed with 0 errors.
+- Bổ sung bộ lọc `HasBrokenOrMissingOptions` tại `ContentGrpcService.cs` (`GetMilestoneQuiz`) để tự động chặn không phát các câu hỏi thiếu đáp án hoặc có đáp án placeholder (`...`) cho học sinh.
+
+### [24/11/2026 - Cập nhật chiều] Khóa & Mở khóa câu hỏi bị gắn cờ trực tiếp trên CSDL
+- Bổ sung `IsFlagged`, `FlagReason`, `FlaggedAt` trong `Question.cs`, `ContentDbContext.cs` & auto `ALTER TABLE` tại `Program.cs`.
+- Bổ sung API `/api/content/questions/flagged`, `/flag`, `/unflag` trong `QuestionsController.cs` và lọc `!q.IsFlagged` tại `ContentGrpcService.cs` & `GetQuestionsBySkillQueryHandler.cs`.

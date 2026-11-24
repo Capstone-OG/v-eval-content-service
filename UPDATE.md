@@ -1,6 +1,9 @@
-# [24/11/2026]
+# UPDATE LOG — V-Eval Content Service
 
-- Fixed intermittent HTTP 500 on `GET /api/content/curriculum` caused by 3-way Cartesian Explosion across 1,800+ skills: enabled `QuerySplittingBehavior.SplitQuery` and `EnableRetryOnFailure(3, 3s)` on `ContentDbContext` in `Program.cs`.
-- Added thread-safe 5-minute `IMemoryCache` (`SemaphoreSlim` stampede guard) in `CurriculumController.cs` with automatic cache invalidation on `ImportCurriculum`, `UpdatePattern`, `UpdateNode`, `CreateNode`, and `DeleteNode`.
-- Raised gRPC server `MaxSendMessageSize` and `MaxReceiveMessageSize` to `32 MB` so full skill-tree gRPC responses never hit the 4 MB default ceiling.
-- Verified with `dotnet build` (0 errors).
+## [24/11/2026] Chặn câu hỏi lỗi đáp án, Khóa/Mở khóa câu hỏi bị báo cáo trên CSDL & Tối ưu Curriculum
+- **Lọc câu hỏi lỗi đáp án**: Bổ sung `HasBrokenOrMissingOptions` trong `ContentGrpcService.cs` để tự động loại bỏ câu hỏi thiếu đáp án, chứa placeholder (`...`, `…`, `-`, `?`, `N/A`) hoặc trùng phương án.
+- **Khóa câu hỏi bị báo cáo trên CSDL**:
+  - Bổ sung 3 cột `is_flagged`, `flag_reason`, `flagged_at` vào `Question.cs`, `ContentDbContext.cs` và lệnh tự động `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` trong `Program.cs`.
+  - Bổ sung các endpoint `GET /api/content/questions/flagged`, `POST /api/content/questions/{id}/flag`, `POST /api/content/questions/{id}/unflag` trong `QuestionsController.cs`.
+  - Lọc `!q.IsFlagged` tại `ContentGrpcService.cs` và `GetQuestionsBySkillQueryHandler.cs` để câu hỏi đang bị gắn cờ không tiếp tục phát cho học sinh cho tới khi được thẩm định/mở khóa.
+- **Hiệu năng Curriculum & gRPC (từ `develop`)**: Bật `QuerySplittingBehavior.SplitQuery`, `EnableRetryOnFailure(3, 3s)`, `IMemoryCache` 5 phút với `SemaphoreSlim` trong `CurriculumController.cs`, và nâng giới hạn gRPC `MaxSendMessageSize`/`MaxReceiveMessageSize` lên `32 MB`.

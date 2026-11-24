@@ -34,7 +34,7 @@ public class GetQuestionsBySkillQueryHandler : IRequestHandler<GetQuestionsBySki
 
         var query = _context.Questions
             .Include(q => q.Passage)
-            .Where(q => q.SkillId == request.SkillId);
+            .Where(q => q.SkillId == request.SkillId && !q.IsFlagged);
 
         if (request.BloomLevel.HasValue && request.BloomLevel.Value > 0)
         {

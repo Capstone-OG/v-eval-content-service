@@ -16,6 +16,9 @@ namespace V_Eval_Content_Service.Domain.Entities
         public string OptionD { get; set; } = string.Empty;
         public char CorrectOption { get; set; }
         public string? Explanation { get; set; }
+        public bool IsFlagged { get; set; } = false;
+        public string? FlagReason { get; set; }
+        public DateTime? FlaggedAt { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation Properties

@@ -104,6 +104,9 @@ namespace V_Eval_Content_Service.Infrastructure.Persistence
                 entity.Property(e => e.OptionD).HasColumnName("option_d").IsRequired();
                 entity.Property(e => e.CorrectOption).HasColumnName("correct_option").IsRequired();
                 entity.Property(e => e.Explanation).HasColumnName("explanation");
+                entity.Property(e => e.IsFlagged).HasColumnName("is_flagged").HasDefaultValue(false);
+                entity.Property(e => e.FlagReason).HasColumnName("flag_reason");
+                entity.Property(e => e.FlaggedAt).HasColumnName("flagged_at");
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
 
                 entity.HasOne(d => d.Skill)
