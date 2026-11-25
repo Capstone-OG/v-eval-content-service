@@ -29,9 +29,9 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
         CancellationToken cancellationToken)
     {
         // Tách thành 3 truy vấn độc lập + chỉ lấy tối đa 1 câu hỏi mẫu/kỹ năng để triệt tiêu Cartesian Explosion & giảm >95% Egress
+        // (QuerySplittingBehavior.SplitQuery đã được cấu hình toàn cục tại ContentDbContext)
         var domains = await _context.CompetencyDomains
             .AsNoTracking()
-            .AsSplitQuery()
             .Include(d => d.Skills)
                 .ThenInclude(s => s.Prerequisites)
             .OrderBy(d => d.DomainId)
