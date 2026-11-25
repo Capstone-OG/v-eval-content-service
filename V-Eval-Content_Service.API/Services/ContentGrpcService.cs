@@ -1,6 +1,8 @@
 using Grpc.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using VEval.Shared.Grpc.Content;
+using V_Eval_Content_Service.API.Caching;
 using V_Eval_Content_Service.Application.Common.Interfaces;
 using V_Eval_Content_Service.Application.Common.Helpers;
 using V_Eval_Content_Service.Domain.Entities;
@@ -9,13 +11,66 @@ namespace V_Eval_Content_Service.API.Services;
 
 public class ContentGrpcService : ContentService.ContentServiceBase
 {
+    private static readonly SemaphoreSlim SkillsTreeLock = new(1, 1);
+    private static readonly SemaphoreSlim SkillsLookupLock = new(1, 1);
+
     private readonly IContentDbContext _context;
+    private readonly IMemoryCache _cache;
     private readonly ILogger<ContentGrpcService> _logger;
 
-    public ContentGrpcService(IContentDbContext context, ILogger<ContentGrpcService> logger)
+    public ContentGrpcService(
+        IContentDbContext context,
+        IMemoryCache cache,
+        ILogger<ContentGrpcService> logger)
     {
         _context = context;
+        _cache = cache;
         _logger = logger;
+    }
+
+    private sealed record SkillLookupItem(Guid SkillId, string Name, Guid? ParentId);
+
+    private async Task<(Dictionary<Guid, Skill> SkillMap, HashSet<Guid> ParentIdsWithChildren)> GetSkillsLookupAsync(CancellationToken ct)
+    {
+        if (_cache.TryGetValue(ContentCacheKeys.SkillsLookup, out (Dictionary<Guid, Skill>, HashSet<Guid>) cached))
+        {
+            return cached;
+        }
+
+        await SkillsLookupLock.WaitAsync(ct);
+        try
+        {
+            if (_cache.TryGetValue(ContentCacheKeys.SkillsLookup, out cached))
+            {
+                return cached;
+            }
+
+            var lightweightSkills = await _context.Skills
+                .AsNoTracking()
+                .Select(s => new SkillLookupItem(s.SkillId, s.Name, s.ParentId))
+                .ToListAsync(ct);
+
+            var skillMap = lightweightSkills.ToDictionary(
+                s => s.SkillId,
+                s => new Skill { SkillId = s.SkillId, Name = s.Name, ParentId = s.ParentId });
+
+            var parentIdsWithChildren = lightweightSkills
+                .Where(s => s.ParentId.HasValue)
+                .Select(s => s.ParentId!.Value)
+                .ToHashSet();
+
+            var value = (skillMap, parentIdsWithChildren);
+            _cache.Set(ContentCacheKeys.SkillsLookup, value, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
+            });
+
+            return value;
+        }
+        finally
+        {
+            SkillsLookupLock.Release();
+        }
     }
 
     internal static string ResolveDomainCode(Guid domainId, string? domainName)
@@ -64,101 +119,126 @@ public class ContentGrpcService : ContentService.ContentServiceBase
         GetSkillsTreeRequest request,
         ServerCallContext context)
     {
-        var skills = await _context.Skills
-            .AsNoTracking()
-            .Include(s => s.Prerequisites)
-            .Include(s => s.Domain)
-            .OrderBy(s => s.SkillId)
-            .ToListAsync(context.CancellationToken);
-
-        var skillMap = skills.ToDictionary(s => s.SkillId);
-        var parentIdsWithChildren = skills
-            .Where(s => s.ParentId.HasValue)
-            .Select(s => s.ParentId!.Value)
-            .ToHashSet();
-
-        var materialsBySkill = await _context.Materials
-            .AsNoTracking()
-            .GroupBy(m => m.SkillId)
-            .Select(g => new
-            {
-                SkillId = g.Key,
-                MaterialId = g.OrderBy(m => m.CreatedAt).Select(m => m.MaterialId).FirstOrDefault(),
-                VideoUrl = g.OrderBy(m => m.CreatedAt).Select(m => m.VideoUrl).FirstOrDefault(v => !string.IsNullOrEmpty(v))
-            })
-            .ToDictionaryAsync(x => x.SkillId, context.CancellationToken);
-
-        var questionCountsBySkill = await _context.Questions
-            .AsNoTracking()
-            .GroupBy(q => q.SkillId)
-            .Select(g => new { SkillId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.SkillId, x => x.Count, context.CancellationToken);
-
         bool learningNodesOnly = string.Equals(request.SubjectId, "LEARNING_NODES", StringComparison.OrdinalIgnoreCase);
+        var cacheKey = learningNodesOnly ? ContentCacheKeys.SkillsTreeLearningNodes : ContentCacheKeys.SkillsTreeAll;
 
-        var response = new GetSkillsTreeResponse();
-
-        foreach (var s in skills)
+        if (_cache.TryGetValue(cacheKey, out GetSkillsTreeResponse? cached) && cached != null)
         {
-            var domainCode = ResolveDomainCode(s.DomainId, s.Domain?.Name);
-            var (level, chapterName, lessonName) = ResolveSkillLineage(s, skillMap, parentIdsWithChildren);
-
-            if (learningNodesOnly && level != "PATTERN")
-            {
-                continue;
-            }
-
-            var subjectName = InferSubjectName(chapterName, s.Name, domainCode);
-
-            materialsBySkill.TryGetValue(s.SkillId, out var mat);
-            // If pattern has no direct material, inherit parent lesson's material or a sibling pattern's material in the same lesson
-            if (mat == null && s.ParentId.HasValue)
-            {
-                materialsBySkill.TryGetValue(s.ParentId.Value, out mat);
-                if (mat == null)
-                {
-                    var siblingId = skills
-                        .Where(sib => sib.ParentId == s.ParentId && sib.SkillId != s.SkillId && materialsBySkill.ContainsKey(sib.SkillId))
-                        .Select(sib => sib.SkillId)
-                        .FirstOrDefault();
-                    if (siblingId != Guid.Empty)
-                    {
-                        materialsBySkill.TryGetValue(siblingId, out mat);
-                    }
-                }
-            }
-
-            questionCountsBySkill.TryGetValue(s.SkillId, out var qCount);
-
-            var node = new SkillNode
-            {
-                SkillId = s.SkillId.ToString(),
-                Name = s.Name,
-                Description = !string.IsNullOrEmpty(chapterName) ? $"{subjectName} • {chapterName}" : (s.Domain?.Name ?? string.Empty),
-                Weight = s.Weight ?? 0.05,
-                DomainId = s.DomainId.ToString(),
-                DomainName = s.Domain?.Name ?? string.Empty,
-                DomainCode = domainCode,
-                ParentId = s.ParentId?.ToString() ?? string.Empty,
-                Level = level,
-                ChapterName = chapterName,
-                LessonName = lessonName,
-                SubjectName = subjectName,
-                MaterialId = mat != null && mat.MaterialId != Guid.Empty ? mat.MaterialId.ToString() : string.Empty,
-                VideoUrl = mat?.VideoUrl ?? string.Empty,
-                QuestionCount = qCount
-            };
-
-            foreach (var prereq in s.Prerequisites)
-            {
-                node.PrerequisiteIds.Add(prereq.PrerequisiteId.ToString());
-            }
-
-            response.Skills.Add(node);
+            return cached;
         }
 
-        _logger.LogInformation("Delivered skills tree with {Count} skills (filter={Filter}).", response.Skills.Count, request.SubjectId);
-        return response;
+        await SkillsTreeLock.WaitAsync(context.CancellationToken);
+        try
+        {
+            if (_cache.TryGetValue(cacheKey, out cached) && cached != null)
+            {
+                return cached;
+            }
+
+            var skills = await _context.Skills
+                .AsNoTracking()
+                .AsSplitQuery()
+                .Include(s => s.Prerequisites)
+                .Include(s => s.Domain)
+                .OrderBy(s => s.SkillId)
+                .ToListAsync(context.CancellationToken);
+
+            var skillMap = skills.ToDictionary(s => s.SkillId);
+            var parentIdsWithChildren = skills
+                .Where(s => s.ParentId.HasValue)
+                .Select(s => s.ParentId!.Value)
+                .ToHashSet();
+
+            var materialsBySkill = await _context.Materials
+                .AsNoTracking()
+                .GroupBy(m => m.SkillId)
+                .Select(g => new
+                {
+                    SkillId = g.Key,
+                    MaterialId = g.OrderBy(m => m.CreatedAt).Select(m => m.MaterialId).FirstOrDefault(),
+                    VideoUrl = g.OrderBy(m => m.CreatedAt).Select(m => m.VideoUrl).FirstOrDefault(v => !string.IsNullOrEmpty(v))
+                })
+                .ToDictionaryAsync(x => x.SkillId, context.CancellationToken);
+
+            var questionCountsBySkill = await _context.Questions
+                .AsNoTracking()
+                .GroupBy(q => q.SkillId)
+                .Select(g => new { SkillId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.SkillId, x => x.Count, context.CancellationToken);
+
+            var response = new GetSkillsTreeResponse();
+
+            foreach (var s in skills)
+            {
+                var domainCode = ResolveDomainCode(s.DomainId, s.Domain?.Name);
+                var (level, chapterName, lessonName) = ResolveSkillLineage(s, skillMap, parentIdsWithChildren);
+
+                if (learningNodesOnly && level != "PATTERN")
+                {
+                    continue;
+                }
+
+                var subjectName = InferSubjectName(chapterName, s.Name, domainCode);
+
+                materialsBySkill.TryGetValue(s.SkillId, out var mat);
+                // If pattern has no direct material, inherit parent lesson's material or a sibling pattern's material in the same lesson
+                if (mat == null && s.ParentId.HasValue)
+                {
+                    materialsBySkill.TryGetValue(s.ParentId.Value, out mat);
+                    if (mat == null)
+                    {
+                        var siblingId = skills
+                            .Where(sib => sib.ParentId == s.ParentId && sib.SkillId != s.SkillId && materialsBySkill.ContainsKey(sib.SkillId))
+                            .Select(sib => sib.SkillId)
+                            .FirstOrDefault();
+                        if (siblingId != Guid.Empty)
+                        {
+                            materialsBySkill.TryGetValue(siblingId, out mat);
+                        }
+                    }
+                }
+
+                questionCountsBySkill.TryGetValue(s.SkillId, out var qCount);
+
+                var node = new SkillNode
+                {
+                    SkillId = s.SkillId.ToString(),
+                    Name = s.Name,
+                    Description = !string.IsNullOrEmpty(chapterName) ? $"{subjectName} • {chapterName}" : (s.Domain?.Name ?? string.Empty),
+                    Weight = s.Weight ?? 0.05,
+                    DomainId = s.DomainId.ToString(),
+                    DomainName = s.Domain?.Name ?? string.Empty,
+                    DomainCode = domainCode,
+                    ParentId = s.ParentId?.ToString() ?? string.Empty,
+                    Level = level,
+                    ChapterName = chapterName,
+                    LessonName = lessonName,
+                    SubjectName = subjectName,
+                    MaterialId = mat != null && mat.MaterialId != Guid.Empty ? mat.MaterialId.ToString() : string.Empty,
+                    VideoUrl = mat?.VideoUrl ?? string.Empty,
+                    QuestionCount = qCount
+                };
+
+                foreach (var prereq in s.Prerequisites)
+                {
+                    node.PrerequisiteIds.Add(prereq.PrerequisiteId.ToString());
+                }
+
+                response.Skills.Add(node);
+            }
+
+            _cache.Set(cacheKey, response, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
+            });
+
+            _logger.LogInformation("Delivered & cached skills tree with {Count} skills (filter={Filter}).", response.Skills.Count, request.SubjectId);
+            return response;
+        }
+        finally
+        {
+            SkillsTreeLock.Release();
+        }
     }
 
     public override async Task<GetQuestionsByDifficultyResponse> GetQuestionsByDifficulty(
@@ -172,7 +252,6 @@ public class ContentGrpcService : ContentService.ContentServiceBase
 
         var query = _context.Questions
             .AsNoTracking()
-            .Include(q => q.Skill)
             .AsQueryable();
 
         if (skillIds.Count > 0)
@@ -194,6 +273,13 @@ public class ContentGrpcService : ContentService.ContentServiceBase
             .OrderBy(q => q.DifficultyLevel)
             .ThenBy(q => q.CreatedAt)
             .Take(limit)
+            .Select(q => new
+            {
+                q.QuestionId,
+                q.SkillId,
+                q.DifficultyLevel,
+                SkillName = q.Skill != null ? q.Skill.Name : null
+            })
             .ToListAsync(context.CancellationToken);
 
         var response = new GetQuestionsByDifficultyResponse();
@@ -204,7 +290,7 @@ public class ContentGrpcService : ContentService.ContentServiceBase
                 QuestionId = q.QuestionId.ToString(),
                 SkillId = q.SkillId.ToString(),
                 Difficulty = q.DifficultyLevel.ToString(),
-                Title = q.Skill?.Name ?? "Câu hỏi khảo thí"
+                Title = q.SkillName ?? "Câu hỏi khảo thí"
             });
         }
 
@@ -220,8 +306,15 @@ public class ContentGrpcService : ContentService.ContentServiceBase
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Exam ID không hợp lệ."));
         }
 
+        var cacheKey = ContentCacheKeys.ExamAnswerKey(examId);
+        if (_cache.TryGetValue(cacheKey, out GetExamAnswerKeyResponse? cached) && cached != null)
+        {
+            return cached;
+        }
+
         var examQuestions = await _context.ExamQuestions
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(eq => eq.Question)
                 .ThenInclude(q => q.Passage)
             .Include(eq => eq.Question)
@@ -236,12 +329,7 @@ public class ContentGrpcService : ContentService.ContentServiceBase
             throw new RpcException(new Status(StatusCode.NotFound, $"Không tìm thấy câu hỏi nào cho đề thi {examId}."));
         }
 
-        var allSkills = await _context.Skills.AsNoTracking().ToListAsync(context.CancellationToken);
-        var skillMap = allSkills.ToDictionary(s => s.SkillId);
-        var parentIdsWithChildren = allSkills
-            .Where(s => s.ParentId.HasValue)
-            .Select(s => s.ParentId!.Value)
-            .ToHashSet();
+        var (skillMap, parentIdsWithChildren) = await GetSkillsLookupAsync(context.CancellationToken);
 
         var response = new GetExamAnswerKeyResponse
         {
@@ -292,7 +380,12 @@ public class ContentGrpcService : ContentService.ContentServiceBase
             response.AnswerKeys.Add(key);
         }
 
-        _logger.LogInformation("Delivered answer keys for exam {ExamId} ({Count} questions)", examId, examQuestions.Count);
+        _cache.Set(cacheKey, response, new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15)
+        });
+
+        _logger.LogInformation("Delivered & cached answer keys for exam {ExamId} ({Count} questions)", examId, examQuestions.Count);
         return response;
     }
 

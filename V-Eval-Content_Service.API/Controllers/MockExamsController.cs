@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
+using V_Eval_Content_Service.API.Caching;
 using V_Eval_Content_Service.API.Controllers.Base;
 using V_Eval_Content_Service.Application.Common.Models;
 using V_Eval_Content_Service.Application.MockExams.Commands.DeleteMockExam;
@@ -12,6 +14,12 @@ namespace V_Eval_Content_Service.API.Controllers;
 [Route("api/content/exams")]
 public class MockExamsController : ApiControllerBase
 {
+    private readonly IMemoryCache _cache;
+
+    public MockExamsController(IMemoryCache cache)
+    {
+        _cache = cache;
+    }
     /// <summary>
     /// Lấy danh sách toàn bộ đề thi có trong ngân hàng đề
     /// </summary>
@@ -71,6 +79,7 @@ public class MockExamsController : ApiControllerBase
             return HandleResult(Result.Failure(
                 Error.NotFound("Exam.NotFound", $"Không tìm thấy đề thi với ID: {id}")));
         }
+        _cache.Remove(ContentCacheKeys.ExamAnswerKey(id));
         return Ok(new { message = "Đã phê duyệt và xuất bản đề thi thành công!", exam_id = id, is_published = true });
     }
 
@@ -88,6 +97,7 @@ public class MockExamsController : ApiControllerBase
             return HandleResult(Result.Failure(
                 Error.NotFound("Exam.NotFound", $"Không tìm thấy đề thi với ID: {id} để xóa")));
         }
+        _cache.Remove(ContentCacheKeys.ExamAnswerKey(id));
         return Ok(new { message = "Đã xóa đề thi thành công!", exam_id = id });
     }
 

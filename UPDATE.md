@@ -1,9 +1,14 @@
-# UPDATE LOG — V-Eval Content Service
+# UPDATE - V-EVAL CONTENT SERVICE
 
-## [24/11/2026] Chặn câu hỏi lỗi đáp án, Khóa/Mở khóa câu hỏi bị báo cáo trên CSDL & Tối ưu Curriculum
-- **Lọc câu hỏi lỗi đáp án**: Bổ sung `HasBrokenOrMissingOptions` trong `ContentGrpcService.cs` để tự động loại bỏ câu hỏi thiếu đáp án, chứa placeholder (`...`, `…`, `-`, `?`, `N/A`) hoặc trùng phương án.
-- **Khóa câu hỏi bị báo cáo trên CSDL**:
-  - Bổ sung 3 cột `is_flagged`, `flag_reason`, `flagged_at` vào `Question.cs`, `ContentDbContext.cs` và lệnh tự động `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` trong `Program.cs`.
-  - Bổ sung các endpoint `GET /api/content/questions/flagged`, `POST /api/content/questions/{id}/flag`, `POST /api/content/questions/{id}/unflag` trong `QuestionsController.cs`.
-  - Lọc `!q.IsFlagged` tại `ContentGrpcService.cs` và `GetQuestionsBySkillQueryHandler.cs` để câu hỏi đang bị gắn cờ không tiếp tục phát cho học sinh cho tới khi được thẩm định/mở khóa.
-- **Hiệu năng Curriculum & gRPC (từ `develop`)**: Bật `QuerySplittingBehavior.SplitQuery`, `EnableRetryOnFailure(3, 3s)`, `IMemoryCache` 5 phút với `SemaphoreSlim` trong `CurriculumController.cs`, và nâng giới hạn gRPC `MaxSendMessageSize`/`MaxReceiveMessageSize` lên `32 MB`.
+## [25/11/2026] - Tối Ưu Supabase Egress (>95%): Cache gRPC, Chặn Cartesian Explosion & Tách Truy Vấn `GetCurriculumTree`
+
+- **Chuẩn Hóa Bộ Đệm Danh Mục Tĩnh (`IMemoryCache`)**:
+  - Tạo [ContentCacheKeys.cs](./V-Eval-Content_Service.API/Caching/ContentCacheKeys.cs) quản lý tập trung khóa cache (`CurriculumTree`, `SkillsTreeAll`, `SkillsTreeLearningNodes`, `SkillsLookup`, `ExamAnswerKey`) và hàm `InvalidateCatalog`.
+  - Cập nhật [ContentGrpcService.cs](./V-Eval-Content_Service.API/Services/ContentGrpcService.cs):
+    - Cache `GetSkillsTree` trong **30 phút** (có `SemaphoreSlim` chống cache stampede) + `.AsSplitQuery()`.
+    - Cache `GetExamAnswerKey` theo `examId` trong **15 phút** + `.AsSplitQuery()`, thay thế `SELECT * FROM Skills` bằng `GetSkillsLookupAsync` nhẹ (chỉ lấy `SkillId`, `Name`, `ParentId`, cache 30 phút).
+    - Thêm `.Select()` projection cho `GetQuestionsByDifficulty` để không kéo `ContentLatex`, `OptionA-D`, `Explanation`.
+- **Triệt Tiêu Quét Toàn Bộ Bảng `Questions` Trong `GetCurriculumTree`**:
+  - Cập nhật [GetCurriculumTreeQuery.cs](./V-Eval-Content_Service.Application/Curriculum/Queries/GetCurriculumTree/GetCurriculumTreeQuery.cs): tách 3 truy vấn độc lập (`.AsSplitQuery()` cho `CompetencyDomains -> Skills -> Prerequisites`, riêng `Materials`, và chỉ lấy tối đa **1 câu hỏi mẫu + tổng số câu** cho mỗi kỹ năng thay vì kéo toàn bộ bảng `Questions`).
+- **Tăng TTL & Xóa Cache Tự Động Khi Ghi**:
+  - Cập nhật [CurriculumController.cs](./V-Eval-Content_Service.API/Controllers/CurriculumController.cs) (nâng TTL từ 5 phút lên **30 phút**, gọi `InvalidateCatalog` khi import/update/create/delete), [QuestionsController.cs](./V-Eval-Content_Service.API/Controllers/QuestionsController.cs) và [MockExamsController.cs](./V-Eval-Content_Service.API/Controllers/MockExamsController.cs).
