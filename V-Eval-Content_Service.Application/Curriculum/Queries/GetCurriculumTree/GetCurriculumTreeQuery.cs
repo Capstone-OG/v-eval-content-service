@@ -28,18 +28,71 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
         GetCurriculumTreeQuery request,
         CancellationToken cancellationToken)
     {
-        // Truy vấn 100% từ Database: CompetencyDomains kèm Skills, Materials, Questions, Prerequisites
-        // (QuerySplittingBehavior.SplitQuery đã được cấu hình tại ContentDbContext)
+        // Tách thành 3 truy vấn độc lập + chỉ lấy tối đa 1 câu hỏi mẫu/kỹ năng để triệt tiêu Cartesian Explosion & giảm >95% Egress
         var domains = await _context.CompetencyDomains
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(d => d.Skills)
                 .ThenInclude(s => s.Prerequisites)
-            .Include(d => d.Skills)
-                .ThenInclude(s => s.Materials)
-            .Include(d => d.Skills)
-                .ThenInclude(s => s.Questions)
             .OrderBy(d => d.DomainId)
             .ToListAsync(cancellationToken);
+
+        var materialsBySkill = (await _context.Materials
+            .AsNoTracking()
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => new Material
+            {
+                MaterialId = m.MaterialId,
+                SkillId = m.SkillId,
+                Title = m.Title,
+                Content = m.Content,
+                DurationSeconds = m.DurationSeconds,
+                VideoUrl = m.VideoUrl,
+                CreatedAt = m.CreatedAt
+            })
+            .ToListAsync(cancellationToken))
+            .GroupBy(m => m.SkillId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var questionStats = await _context.Questions
+            .AsNoTracking()
+            .GroupBy(q => q.SkillId)
+            .Select(g => new
+            {
+                SkillId = g.Key,
+                Count = g.Count(),
+                SampleQuestionId = g.OrderBy(q => q.CreatedAt).Select(q => q.QuestionId).FirstOrDefault()
+            })
+            .ToListAsync(cancellationToken);
+
+        var questionCountBySkill = questionStats.ToDictionary(x => x.SkillId, x => x.Count);
+        var sampleQuestionIds = questionStats
+            .Where(x => x.SampleQuestionId != Guid.Empty)
+            .Select(x => x.SampleQuestionId)
+            .Distinct()
+            .ToList();
+
+        var sampleQuestionBySkill = sampleQuestionIds.Count > 0
+            ? (await _context.Questions
+                .AsNoTracking()
+                .Where(q => sampleQuestionIds.Contains(q.QuestionId))
+                .Select(q => new Question
+                {
+                    QuestionId = q.QuestionId,
+                    SkillId = q.SkillId,
+                    DifficultyLevel = q.DifficultyLevel,
+                    ContentLatex = q.ContentLatex,
+                    OptionA = q.OptionA,
+                    OptionB = q.OptionB,
+                    OptionC = q.OptionC,
+                    OptionD = q.OptionD,
+                    CorrectOption = q.CorrectOption,
+                    Explanation = q.Explanation
+                })
+                .ToListAsync(cancellationToken))
+                .GroupBy(q => q.SkillId)
+                .ToDictionary(g => g.Key, g => g.First())
+            : new Dictionary<Guid, Question>();
 
         var resultList = new List<CurriculumDomainDto>();
 
@@ -76,12 +129,13 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
                 int chapOrder = 1;
                 foreach (var chap in chapters)
                 {
+                    materialsBySkill.TryGetValue(chap.SkillId, out var chapMat);
                     var chapterDto = new CurriculumChapterDto
                     {
                         ChapterId = chap.SkillId.ToString(),
                         Name = chap.Name,
                         Code = $"CH_{chapOrder++:D2}",
-                        Description = chap.Materials.FirstOrDefault()?.Content ?? $"Hệ thống kiến thức: {chap.Name}",
+                        Description = chapMat?.Content ?? $"Hệ thống kiến thức: {chap.Name}",
                         Weight = chap.Weight ?? 0.25,
                         Lessons = new List<CurriculumLessonDto>()
                     };
@@ -94,12 +148,13 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
                     int lesOrder = 1;
                     foreach (var les in lessons)
                     {
+                        materialsBySkill.TryGetValue(les.SkillId, out var lesMat);
                         var lessonDto = new CurriculumLessonDto
                         {
                             LessonId = les.SkillId.ToString(),
                             Name = les.Name,
                             Code = $"{chapterDto.Code}_L{lesOrder++:D2}",
-                            Summary = les.Materials.FirstOrDefault()?.Content ?? $"Bài học: {les.Name}",
+                            Summary = lesMat?.Content ?? $"Bài học: {les.Name}",
                             Weight = les.Weight ?? 0.08,
                             Patterns = new List<CurriculumPatternDto>()
                         };
@@ -108,13 +163,13 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
                         int patOrder = 1;
                         foreach (var pat in patterns)
                         {
-                            lessonDto.Patterns.Add(BuildPatternFromEntity(pat, $"{lessonDto.Code}_P{patOrder++:D2}"));
+                            lessonDto.Patterns.Add(BuildPatternFromEntity(pat, $"{lessonDto.Code}_P{patOrder++:D2}", materialsBySkill, sampleQuestionBySkill, questionCountBySkill));
                         }
 
                         // Nếu bài học là lá (chưa có dạng bài con), lấy chính nó làm dạng bài
                         if (lessonDto.Patterns.Count == 0)
                         {
-                            lessonDto.Patterns.Add(BuildPatternFromEntity(les, $"{lessonDto.Code}_P01"));
+                            lessonDto.Patterns.Add(BuildPatternFromEntity(les, $"{lessonDto.Code}_P01", materialsBySkill, sampleQuestionBySkill, questionCountBySkill));
                         }
 
                         chapterDto.Lessons.Add(lessonDto);
@@ -141,16 +196,17 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
                 int lesIdx = 1;
                 foreach (var s in flatSkills)
                 {
+                    materialsBySkill.TryGetValue(s.SkillId, out var flatMat);
                     var lessonDto = new CurriculumLessonDto
                     {
                         LessonId = s.SkillId.ToString(),
                         Name = s.Name,
                         Code = $"{defaultChap.Code}_L{lesIdx++:D2}",
-                        Summary = s.Materials.FirstOrDefault()?.Content ?? s.Name,
+                        Summary = flatMat?.Content ?? s.Name,
                         Weight = s.Weight ?? 0.08,
                         Patterns = new List<CurriculumPatternDto>
                         {
-                            BuildPatternFromEntity(s, $"{defaultChap.Code}_P{lesIdx:D2}")
+                            BuildPatternFromEntity(s, $"{defaultChap.Code}_P{lesIdx:D2}", materialsBySkill, sampleQuestionBySkill, questionCountBySkill)
                         }
                     };
                     defaultChap.Lessons.Add(lessonDto);
@@ -162,8 +218,8 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
             // 3. Danh sách phẳng Skills (tương thích ngược)
             foreach (var s in allSkills)
             {
-                var mat = s.Materials.FirstOrDefault();
-                var q = s.Questions.FirstOrDefault();
+                materialsBySkill.TryGetValue(s.SkillId, out var mat);
+                sampleQuestionBySkill.TryGetValue(s.SkillId, out var q);
 
                 domainDto.Skills.Add(new CurriculumSkillDto
                 {
@@ -203,10 +259,16 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
         return Result<List<CurriculumDomainDto>>.Success(resultList);
     }
 
-    private static CurriculumPatternDto BuildPatternFromEntity(Skill s, string code)
+    private static CurriculumPatternDto BuildPatternFromEntity(
+        Skill s,
+        string code,
+        Dictionary<Guid, Material> materialsBySkill,
+        Dictionary<Guid, Question> sampleQuestionBySkill,
+        Dictionary<Guid, int> questionCountBySkill)
     {
-        var mat = s.Materials.FirstOrDefault();
-        var q = s.Questions.FirstOrDefault();
+        materialsBySkill.TryGetValue(s.SkillId, out var mat);
+        sampleQuestionBySkill.TryGetValue(s.SkillId, out var q);
+        questionCountBySkill.TryGetValue(s.SkillId, out var qCount);
 
         string theory = "";
         string method = "";
@@ -275,7 +337,7 @@ public class GetCurriculumTreeQueryHandler : IRequestHandler<GetCurriculumTreeQu
                 Correct = q.CorrectOption switch { 'A' => 0, 'B' => 1, 'C' => 2, 'D' => 3, _ => 0 },
                 Explanation = q.Explanation ?? ""
             } : null,
-            QuestionBankCount = s.Questions.Count
+            QuestionBankCount = qCount
         };
     }
 
