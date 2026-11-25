@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using V_Eval_Content_Service.API.Caching;
 using V_Eval_Content_Service.API.Controllers.Base;
 using V_Eval_Content_Service.Application.Common.Interfaces;
 using V_Eval_Content_Service.Application.Questions.Commands.CreateQuestion;
@@ -23,10 +25,12 @@ namespace V_Eval_Content_Service.API.Controllers;
 public class QuestionsController : ApiControllerBase
 {
     private readonly IContentDbContext _dbContext;
+    private readonly IMemoryCache _cache;
 
-    public QuestionsController(IContentDbContext dbContext)
+    public QuestionsController(IContentDbContext dbContext, IMemoryCache cache)
     {
         _dbContext = dbContext;
+        _cache = cache;
     }
     /// <summary>
     /// Core Flow 2 - API 16: Thêm mới câu hỏi trắc nghiệm gốc vào ngân hàng đề
@@ -58,6 +62,7 @@ public class QuestionsController : ApiControllerBase
         var result = await Mediator.Send(command);
         if (result.IsSuccess)
         {
+            ContentCacheKeys.InvalidateCatalog(_cache);
             return CreatedAtAction(nameof(GetQuestionById), new { id = result.Value.QuestionId }, result.Value);
         }
 
@@ -91,6 +96,7 @@ public class QuestionsController : ApiControllerBase
         );
 
         var result = await Mediator.Send(command);
+        if (result.IsSuccess) ContentCacheKeys.InvalidateCatalog(_cache);
         return HandleResult(result);
     }
 
@@ -106,6 +112,7 @@ public class QuestionsController : ApiControllerBase
     public async Task<IActionResult> DeleteQuestion(Guid id)
     {
         var result = await Mediator.Send(new DeleteQuestionCommand(id));
+        if (result.IsSuccess) ContentCacheKeys.InvalidateCatalog(_cache);
         return HandleResult(result);
     }
 

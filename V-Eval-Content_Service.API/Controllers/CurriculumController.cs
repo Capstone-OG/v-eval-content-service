@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
+using V_Eval_Content_Service.API.Caching;
 using V_Eval_Content_Service.API.Controllers.Base;
 using V_Eval_Content_Service.Application.Common.Models;
 using V_Eval_Content_Service.Application.Curriculum.Commands.ImportCurriculum;
@@ -19,7 +20,7 @@ namespace V_Eval_Content_Service.API.Controllers;
 [Route("api/content/curriculum")]
 public class CurriculumController : ApiControllerBase
 {
-    private const string CurriculumTreeCacheKey = "content:curriculum:tree:v1";
+    private const string CurriculumTreeCacheKey = ContentCacheKeys.CurriculumTree;
     private static readonly SemaphoreSlim CurriculumCacheLock = new(1, 1);
     private readonly IMemoryCache _cache;
 
@@ -58,7 +59,7 @@ public class CurriculumController : ApiControllerBase
             {
                 _cache.Set(CurriculumTreeCacheKey, result, new MemoryCacheEntryOptions
                 {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
                 });
             }
             return HandleResult(result);
@@ -83,7 +84,7 @@ public class CurriculumController : ApiControllerBase
     public async Task<IActionResult> ImportCurriculum([FromBody] ImportCurriculumRequestDto dto)
     {
         var result = await Mediator.Send(new ImportCurriculumCommand(dto));
-        if (result.IsSuccess) _cache.Remove(CurriculumTreeCacheKey);
+        if (result.IsSuccess) ContentCacheKeys.InvalidateCatalog(_cache);
         return HandleResult(result);
     }
 
@@ -101,7 +102,7 @@ public class CurriculumController : ApiControllerBase
     public async Task<IActionResult> UpdatePattern([FromRoute] string id, [FromBody] UpdateCurriculumPatternDto dto)
     {
         var result = await Mediator.Send(new V_Eval_Content_Service.Application.Curriculum.Commands.UpdatePattern.UpdatePatternCommand(id, dto));
-        if (result.IsSuccess) _cache.Remove(CurriculumTreeCacheKey);
+        if (result.IsSuccess) ContentCacheKeys.InvalidateCatalog(_cache);
         return HandleResult(result);
     }
 
@@ -115,7 +116,7 @@ public class CurriculumController : ApiControllerBase
     public async Task<IActionResult> UpdateNode([FromRoute] System.Guid id, [FromBody] UpdateCurriculumNodeDto dto)
     {
         var result = await Mediator.Send(new V_Eval_Content_Service.Application.Curriculum.Commands.UpdateNode.UpdateNodeCommand(id, dto));
-        if (result.IsSuccess) _cache.Remove(CurriculumTreeCacheKey);
+        if (result.IsSuccess) ContentCacheKeys.InvalidateCatalog(_cache);
         return HandleResult(result);
     }
 
@@ -128,7 +129,7 @@ public class CurriculumController : ApiControllerBase
     public async Task<IActionResult> CreateNode([FromBody] CreateCurriculumNodeDto dto)
     {
         var result = await Mediator.Send(new V_Eval_Content_Service.Application.Curriculum.Commands.CreateNode.CreateNodeCommand(dto));
-        if (result.IsSuccess) _cache.Remove(CurriculumTreeCacheKey);
+        if (result.IsSuccess) ContentCacheKeys.InvalidateCatalog(_cache);
         return HandleResult(result);
     }
 
@@ -142,7 +143,7 @@ public class CurriculumController : ApiControllerBase
     public async Task<IActionResult> DeleteNode([FromRoute] string id)
     {
         var result = await Mediator.Send(new V_Eval_Content_Service.Application.Curriculum.Commands.DeleteNode.DeleteNodeCommand(id));
-        if (result.IsSuccess) _cache.Remove(CurriculumTreeCacheKey);
+        if (result.IsSuccess) ContentCacheKeys.InvalidateCatalog(_cache);
         return HandleResult(result);
     }
 }

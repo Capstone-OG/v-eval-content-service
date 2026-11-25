@@ -1,5 +1,15 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [25/11/2026] - Tối Ưu Supabase Egress (>95%): Cache gRPC, Chặn Cartesian Explosion & Tách Truy Vấn `GetCurriculumTree`
+
+- **Cache gRPC & Danh Mục Tĩnh ([`ContentCacheKeys.cs`](../V-Eval-Content_Service.API/Caching/ContentCacheKeys.cs), [`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
+  - Bổ sung `IMemoryCache` + `SemaphoreSlim` cho `GetSkillsTree` (TTL 30 phút), `GetExamAnswerKey` (TTL 15 phút) và `GetSkillsLookupAsync` (chỉ chiếu `SkillId`, `Name`, `ParentId`, TTL 30 phút), loại bỏ hàng chục nghìn lượt quét `SELECT * FROM Skills`.
+  - Áp dụng `.Select()` projection cho `GetQuestionsByDifficulty` và `.AsSplitQuery()` cho các truy vấn nhiều `.Include()`.
+- **Tối Ưu `GetCurriculumTree` ([`GetCurriculumTreeQuery.cs`](../V-Eval-Content_Service.Application/Curriculum/Queries/GetCurriculumTree/GetCurriculumTreeQuery.cs))**:
+  - Tách 3 truy vấn độc lập và chỉ lấy tối đa 1 câu hỏi mẫu kèm `Count` theo từng `SkillId` thay vì kéo toàn bộ bảng `Questions`.
+- **Tăng TTL & Vô Hiệu Hóa Cache Khi Ghi ([`CurriculumController.cs`](../V-Eval-Content_Service.API/Controllers/CurriculumController.cs), [`QuestionsController.cs`](../V-Eval-Content_Service.API/Controllers/QuestionsController.cs), [`MockExamsController.cs`](../V-Eval-Content_Service.API/Controllers/MockExamsController.cs))**:
+  - Nâng TTL `GetCurriculumTree` lên 30 phút và tự động gọi `ContentCacheKeys.InvalidateCatalog` / xóa `ExamAnswerKey` khi dữ liệu thay đổi.
+
 ## [23/11/2026] - Chống Trùng Lặp Theo Nội Dung & Xáo Trộn Ngẫu Nhiên Trong `GetMilestoneQuiz`
 
 - **Chống Trùng Nội Dung & Đa Dạng Hóa Câu Hỏi ([`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
