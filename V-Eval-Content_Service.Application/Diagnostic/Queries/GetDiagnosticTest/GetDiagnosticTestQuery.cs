@@ -30,7 +30,7 @@ public class GetDiagnosticTestQueryHandler : IRequestHandler<GetDiagnosticTestQu
             foreach (var id in request.ExcludeExamIds) excludedIds.Add(id);
         }
 
-        // 1. Tìm đề thi chẩn đoán (ExamCategory = "DIAGNOSTIC"), loại trừ toàn bộ đề đã làm
+        // 1. Tìm toàn bộ đề thi chẩn đoán đã xuất bản (ExamCategory = "DIAGNOSTIC" && IsPublished), loại trừ đề đã làm
         var baseQuery = _context.MockExams
             .AsNoTracking()
             .Include(e => e.ExamQuestions)
@@ -40,25 +40,33 @@ public class GetDiagnosticTestQueryHandler : IRequestHandler<GetDiagnosticTestQu
                 .ThenInclude(eq => eq.Question)
                     .ThenInclude(q => q.Skill)
                         .ThenInclude(s => s.Domain)
-            .Where(e => e.ExamCategory == "DIAGNOSTIC");
+            .Where(e => e.ExamCategory == "DIAGNOSTIC" && e.IsPublished);
 
         var filteredQuery = excludedIds.Count > 0
             ? baseQuery.Where(e => !excludedIds.Contains(e.ExamId))
             : baseQuery;
 
-        var exam = await filteredQuery
+        var candidateExams = await filteredQuery
             .OrderByDescending(e => e.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        // 2. Nếu có loại trừ nhưng không còn đề mới, fallback trả về đề chẩn đoán mới nhất
+        MockExam? exam = candidateExams.Count > 0
+            ? candidateExams[Random.Shared.Next(candidateExams.Count)]
+            : null;
+
+        // 2. Nếu có loại trừ nhưng không còn đề mới, chọn ngẫu nhiên trong toàn bộ đề DIAGNOSTIC đã xuất bản
         if (exam == null && excludedIds.Count > 0)
         {
-            exam = await baseQuery
+            var allDiagExams = await baseQuery
                 .OrderByDescending(e => e.CreatedAt)
-                .FirstOrDefaultAsync(cancellationToken);
+                .ToListAsync(cancellationToken);
+            if (allDiagExams.Count > 0)
+            {
+                exam = allDiagExams[Random.Shared.Next(allDiagExams.Count)];
+            }
         }
 
-        // 3. Nếu chưa có đề gắn cờ DIAGNOSTIC, lấy đề mới nhất làm fallback
+        // 3. Nếu chưa có đề gắn cờ DIAGNOSTIC đã xuất bản, lấy đề đã xuất bản mới nhất làm fallback
         if (exam == null)
         {
             exam = await _context.MockExams
@@ -70,6 +78,7 @@ public class GetDiagnosticTestQueryHandler : IRequestHandler<GetDiagnosticTestQu
                     .ThenInclude(eq => eq.Question)
                         .ThenInclude(q => q.Skill)
                             .ThenInclude(s => s.Domain)
+                .Where(e => e.IsPublished)
                 .OrderByDescending(e => e.CreatedAt)
                 .FirstOrDefaultAsync(cancellationToken);
         }
