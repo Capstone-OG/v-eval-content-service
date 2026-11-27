@@ -1,5 +1,14 @@
 # NHẬT KÝ KIỂM TRA TIẾN ĐỘ VẬN HÀNH (DAILY CHECK LOG) - CONTENT SERVICE
 
+## [27/11/2026] - Chọn Ngẫu Nhiên Đề Đánh Giá Đầu Vào Đã Xuất Bản (`GetDiagnosticTestQuery`)
+
+- **Phát Đề Đầu Vào Ngẫu Nhiên ([`GetDiagnosticTestQuery.cs`](../V-Eval-Content_Service.Application/Diagnostic/Queries/GetDiagnosticTest/GetDiagnosticTestQuery.cs))**:
+  - Bổ sung lọc `e.ExamCategory == "DIAGNOSTIC" && e.IsPublished` và chọn ngẫu nhiên bằng `Random.Shared.Next(...)` trong tập các đề thí sinh chưa làm thay vì lấy cố định phần tử đầu tiên.
+- **Chuẩn Hóa Ngân Hàng Đề Đầu Vào (Supabase `v_eval_content`)**:
+  - Chuyển đúng 91 kỹ năng Ngôn ngữ về `DOM_LANG`, dựng lại 3 đề `DIAGNOSTIC` chuẩn (30 câu/đề, 90 câu không trùng lặp) và chuyển đổi 19/19 câu hỏi bảng số liệu dạng văn xuôi sang chuẩn Markdown Table.
+
+---
+
 ## [25/11/2026] - Tối Ưu Supabase Egress (>95%): Cache gRPC, Chặn Cartesian Explosion & Tách Truy Vấn `GetCurriculumTree`
 
 - **Cache gRPC & Danh Mục Tĩnh ([`ContentCacheKeys.cs`](../V-Eval-Content_Service.API/Caching/ContentCacheKeys.cs), [`ContentGrpcService.cs`](../V-Eval-Content_Service.API/Services/ContentGrpcService.cs))**:
