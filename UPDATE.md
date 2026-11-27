@@ -1,14 +1,10 @@
 # UPDATE - V-EVAL CONTENT SERVICE
 
-## [25/11/2026] - Tối Ưu Supabase Egress (>95%): Cache gRPC, Chặn Cartesian Explosion & Tách Truy Vấn `GetCurriculumTree`
+## [27/11/2026] - Chọn Ngẫu Nhiên Đề Đánh Giá Đầu Vào Đã Xuất Bản Trong `GetDiagnosticTestQuery`
 
-- **Chuẩn Hóa Bộ Đệm Danh Mục Tĩnh (`IMemoryCache`)**:
-  - Tạo [ContentCacheKeys.cs](./V-Eval-Content_Service.API/Caching/ContentCacheKeys.cs) quản lý tập trung khóa cache (`CurriculumTree`, `SkillsTreeAll`, `SkillsTreeLearningNodes`, `SkillsLookup`, `ExamAnswerKey`) và hàm `InvalidateCatalog`.
-  - Cập nhật [ContentGrpcService.cs](./V-Eval-Content_Service.API/Services/ContentGrpcService.cs):
-    - Cache `GetSkillsTree` trong **30 phút** (có `SemaphoreSlim` chống cache stampede) + `.AsSplitQuery()`.
-    - Cache `GetExamAnswerKey` theo `examId` trong **15 phút** + `.AsSplitQuery()`, thay thế `SELECT * FROM Skills` bằng `GetSkillsLookupAsync` nhẹ (chỉ lấy `SkillId`, `Name`, `ParentId`, cache 30 phút).
-    - Thêm `.Select()` projection cho `GetQuestionsByDifficulty` để không kéo `ContentLatex`, `OptionA-D`, `Explanation`.
-- **Triệt Tiêu Quét Toàn Bộ Bảng `Questions` Trong `GetCurriculumTree`**:
-  - Cập nhật [GetCurriculumTreeQuery.cs](./V-Eval-Content_Service.Application/Curriculum/Queries/GetCurriculumTree/GetCurriculumTreeQuery.cs): tách 3 truy vấn độc lập (`.AsSplitQuery()` cho `CompetencyDomains -> Skills -> Prerequisites`, riêng `Materials`, và chỉ lấy tối đa **1 câu hỏi mẫu + tổng số câu** cho mỗi kỹ năng thay vì kéo toàn bộ bảng `Questions`).
-- **Tăng TTL & Xóa Cache Tự Động Khi Ghi**:
-  - Cập nhật [CurriculumController.cs](./V-Eval-Content_Service.API/Controllers/CurriculumController.cs) (nâng TTL từ 5 phút lên **30 phút**, gọi `InvalidateCatalog` khi import/update/create/delete), [QuestionsController.cs](./V-Eval-Content_Service.API/Controllers/QuestionsController.cs) và [MockExamsController.cs](./V-Eval-Content_Service.API/Controllers/MockExamsController.cs).
+- **Đa Dạng Hóa Đề Kiểm Tra Đầu Vào ([GetDiagnosticTestQuery.cs](./V-Eval-Content_Service.Application/Diagnostic/Queries/GetDiagnosticTest/GetDiagnosticTestQuery.cs))**:
+  - Lọc chặt chỉ lấy các đề thuộc danh mục `DIAGNOSTIC` đã xuất bản (`IsPublished == true`).
+  - Chọn ngẫu nhiên (`Random.Shared.Next(...)`) trong danh sách đề đầu vào chưa hoàn thành thay vì luôn phát cố định đề đầu tiên.
+- **Chuẩn Hóa Dữ Liệu Đề Đầu Vào & Bảng Số Liệu (Supabase `v_eval_content`)**:
+  - Sửa phân loại domain cho 91 kỹ năng Ngôn ngữ bị gắn nhầm sang `DOM_MATH` và chuẩn hóa lại bộ 3 đề `DIAGNOSTIC` (90 câu hỏi độc nhất, đúng phân bổ 5 Việt + 5 Anh + 8 Toán + 6 KHTN + 6 KHXH).
+  - Chuẩn hóa toàn bộ 19 câu hỏi chứa bảng dạng văn bản sang chuẩn Markdown Table.
